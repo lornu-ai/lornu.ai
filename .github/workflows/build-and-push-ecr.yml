@@ -31,8 +31,8 @@ permissions:
 
 env:
   AWS_REGION: us-east-1
-  ECR_REPO_NAME: lornu-web
-  IMAGE_NAME: lornu-web
+  ECR_REPO_NAME: lornu.ai
+  IMAGE_NAME: lornu.ai
 
 jobs:
   build-and-push:
