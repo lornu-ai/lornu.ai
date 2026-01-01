@@ -5,7 +5,7 @@ name: "Build and Push lornu.ai to AWS ECR"
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - 'src/**'
       - 'public/**'
