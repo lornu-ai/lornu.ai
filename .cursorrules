@@ -1,0 +1,36 @@
+# lornu.ai - Cursor Rules
+
+## Scope
+This is a **satellite repository** for the Lornu AI web application:
+- **Type**: Frontend web application (React + Vite + Bun)
+- **Deployment**: AWS EKS via Flux CD (managed in private-lornu-ai hub)
+- **Staging Domain**: `future.lornu.ai`
+- **Registry**: AWS ECR (`lornu-web` repository)
+
+## Tech Stack
+- **Frontend**: React 18 + TypeScript
+- **Build Tool**: Vite 6
+- **Package Manager**: Bun (or npm/pnpm compatible)
+- **Styling**: Tailwind CSS 4
+- **UI Components**: Radix UI + Material UI
+- **Runtime**: Node.js 18+ or Bun
+
+## Development
+- Run `bun install` (or `npm install`) to install dependencies
+- Run `bun run dev` (or `npm run dev`) to start dev server
+- Run `bun run build` (or `npm run build`) to build for production
+- Health check endpoint: `/healthz` (required for Kubernetes)
+
+## Deployment
+- Container builds MUST use `--platform linux/amd64` (EKS requirement)
+- Images pushed to: `{AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/lornu-web`
+- Deployment manifests managed in `private-lornu-ai` hub repository
+- Flux CD reconciles automatically from hub repo
+
+## Standards
+- Mobile-first responsive design
+- Follow existing component patterns (Radix UI + shadcn/ui style)
+- Maintain 70%+ test coverage
+- Use TypeScript strictly
+- Follow conventional commits
+

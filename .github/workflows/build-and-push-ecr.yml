@@ -1,0 +1,156 @@
+name: "Build and Push lornu.ai to AWS ECR"
+
+# Build and push lornu.ai web application container image to AWS ECR
+# Tags images with version format (v0.1.0) for Flux/ArgoCD tracking
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'package.json'
+      - 'vite.config.ts'
+      - 'Dockerfile'
+      - '.github/workflows/build-and-push-ecr.yml'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., "v0.1.0")'
+        required: true
+        type: string
+      push_to_ecr:
+        description: 'Push to ECR'
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write  # Required to update kustomization.yaml in hub repo
+  id-token: write  # For OIDC if using AWS role assumption
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPO_NAME: lornu-web
+  IMAGE_NAME: lornu-web
+
+jobs:
+  build-and-push:
+    name: "Build and Push lornu.ai to ECR"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0  # Full history for git SHA
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get AWS Account ID
+        id: aws-account
+        run: |
+          AWS_ACCOUNT_ID="${{ secrets.AWS_ACCOUNT_ID }}"
+          if [ -z "$AWS_ACCOUNT_ID" ]; then
+            echo "⚠️  AWS_ACCOUNT_ID secret not found, getting from AWS CLI..."
+            AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+            if [ -z "$AWS_ACCOUNT_ID" ]; then
+              echo "❌ Error: Could not determine AWS Account ID"
+              exit 1
+            fi
+          fi
+          echo "account_id=${AWS_ACCOUNT_ID}" >> "$GITHUB_OUTPUT"
+          echo "✅ AWS Account ID: ${AWS_ACCOUNT_ID}"
+
+      - name: Create ECR Repository (if not exists)
+        run: |
+          if aws ecr describe-repositories --repository-names "${{ env.ECR_REPO_NAME }}" --region "${{ env.AWS_REGION }}" 2>/dev/null; then
+            echo "✅ ECR repository '${{ env.ECR_REPO_NAME }}' already exists"
+          else
+            echo "📦 Creating ECR repository '${{ env.ECR_REPO_NAME }}'..."
+            aws ecr create-repository \
+              --repository-name "${{ env.ECR_REPO_NAME }}" \
+              --region "${{ env.AWS_REGION }}" \
+              --image-scanning-configuration scanOnPush=true \
+              --image-tag-mutability IMMUTABLE || {
+              echo "⚠️  Failed to create repository (may already exist or insufficient permissions)"
+            }
+          fi
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Generate Image Tags
+        id: tags
+        run: |
+          # Determine version tag
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            # Use git tag or short SHA for push events
+            VERSION="${GITHUB_REF#refs/tags/}"
+            if [ "$VERSION" == "$GITHUB_REF" ]; then
+              VERSION="v$(git rev-parse --short HEAD)"
+            fi
+          fi
+
+          # Full ECR repository URL
+          ECR_REPO="${{ steps.aws-account.outputs.account_id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO_NAME }}"
+          IMAGE_URL="${ECR_REPO}:${VERSION}"
+          LATEST_TAG="${ECR_REPO}:latest"
+
+          {
+            echo "version=${VERSION}"
+            echo "image_url=${IMAGE_URL}"
+            echo "latest_tag=${LATEST_TAG}"
+            echo "ecr_repo=${ECR_REPO}"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "📦 Image tags:"
+          echo "  Version: ${IMAGE_URL}"
+          echo "  Latest: ${LATEST_TAG}"
+
+      - name: Build Container Image
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            --tag ${{ steps.tags.outputs.image_url }} \
+            --tag ${{ steps.tags.outputs.latest_tag }} \
+            --file Dockerfile \
+            .
+          echo "✅ Container image built successfully"
+
+      - name: Push to Amazon ECR
+        if: ${{ inputs.push_to_ecr != false || github.event_name == 'push' }}
+        run: |
+          set +e  # Don't exit on error for latest tag push
+          
+          # Push version tag (always push this)
+          docker push ${{ steps.tags.outputs.image_url }}
+          echo "✅ Version tag pushed: ${{ steps.tags.outputs.image_url }}"
+          
+          # Try to push 'latest' tag (may fail if immutable and already exists)
+          docker push ${{ steps.tags.outputs.latest_tag }} 2>&1
+          LATEST_EXIT=$?
+          if [ $LATEST_EXIT -eq 0 ]; then
+            echo "✅ Latest tag pushed: ${{ steps.tags.outputs.latest_tag }}"
+          else
+            echo "⚠️  Latest tag push failed (may be immutable or already exists) - continuing"
+          fi
+          
+          set -e  # Re-enable exit on error
+          echo "✅ Images pushed to ECR successfully"
+
+      - name: Summary
+        run: |
+          echo "✅ Build and push completed"
+          echo "📦 Image: ${{ steps.tags.outputs.image_url }}"
+          echo "🔖 Version: ${{ steps.tags.outputs.version }}"
+          echo "🚀 ECR Repository: ${{ steps.tags.outputs.ecr_repo }}"
+          echo "🌐 Staging Domain: future.lornu.ai"
+
