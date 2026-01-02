@@ -5,7 +5,10 @@ import { AgentOrchestrator } from './AgentOrchestrator';
 
 export function HeroSection() {
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden px-4 md:px-8 py-20">
+    <section
+      data-testid="hero-section"
+      className="relative min-h-screen flex items-center justify-center overflow-hidden px-4 md:px-8 py-20"
+    >
       {/* Background gradient effects */}
       <div className="absolute inset-0 bg-gradient-to-br from-[#00F5FF]/5 via-transparent to-[#D1FF26]/5 pointer-events-none" />
       <div className="absolute top-20 -left-20 w-96 h-96 bg-[#00F5FF]/10 rounded-full blur-3xl" />
@@ -31,16 +34,15 @@ export function HeroSection() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#D1FF26] opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-[#D1FF26]"></span>
                 </span>
-                <span className="text-sm text-[#00F5FF]" style={{ fontFamily: 'Inter, sans-serif' }}>
+                <span className="text-sm text-[#00F5FF] font-inter">
                   Platform Now Live
                 </span>
               </span>
             </motion.div>
 
-            <h1 
-              className="text-5xl md:text-6xl lg:text-7xl tracking-tight"
-              style={{ 
-                fontFamily: 'Inter Tight, sans-serif',
+            <h1
+              className="text-5xl md:text-6xl lg:text-7xl tracking-tight font-inter-tight"
+              style={{
                 letterSpacing: '-0.02em'
               }}
             >
@@ -50,29 +52,24 @@ export function HeroSection() {
               </span>
             </h1>
 
-            <p 
-              className="text-xl text-gray-400 max-w-2xl"
-              style={{ fontFamily: 'Inter, sans-serif' }}
-            >
-              Build, deploy, and orchestrate autonomous agents with a fully customizable, 
+            <p className="text-xl text-gray-400 max-w-2xl font-inter">
+              Build, deploy, and orchestrate autonomous agents with a fully customizable,
               off-the-shelf platform. Ship production-ready AI solutions in days, not months.
             </p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4">
-            <Button 
+            <Button
               size="lg"
-              className="bg-[#00F5FF] hover:bg-[#00F5FF]/90 text-[#0A0A0B] group"
-              style={{ fontFamily: 'Inter, sans-serif' }}
+              className="bg-[#00F5FF] hover:bg-[#00F5FF]/90 text-[#0A0A0B] group font-inter"
             >
               Start Free Trial
               <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
             </Button>
-            <Button 
+            <Button
               size="lg"
               variant="outline"
-              className="border-[#00F5FF]/30 hover:bg-[#00F5FF]/10"
-              style={{ fontFamily: 'Inter, sans-serif' }}
+              className="border-[#00F5FF]/30 hover:bg-[#00F5FF]/10 font-inter"
             >
               <BookOpen className="mr-2 h-4 w-4" />
               View Documentation
