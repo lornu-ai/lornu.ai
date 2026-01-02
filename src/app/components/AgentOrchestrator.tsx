@@ -1,5 +1,4 @@
 import { motion } from 'motion/react';
-import { useEffect, useState } from 'react';
 import { Brain, Shield, Terminal, CheckCircle2, Activity } from 'lucide-react';
 
 interface Agent {
@@ -12,23 +11,14 @@ interface Agent {
 }
 
 export function AgentOrchestrator() {
-  const [activeAgent, setActiveAgent] = useState(0);
-  
   const agents: Agent[] = [
     { id: 'triage', name: 'Triage Agent', role: 'Analysis', icon: Brain, status: 'complete', color: '#D1FF26' },
     { id: 'sre', name: 'SRE Agent', role: 'Operations', icon: Shield, status: 'processing', color: '#00F5FF' },
     { id: 'gac', name: 'GAC Agent', role: 'Governance', icon: CheckCircle2, status: 'idle', color: '#8B5CF6' }
   ];
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveAgent((prev) => (prev + 1) % agents.length);
-    }, 2500);
-    return () => clearInterval(interval);
-  }, []);
-
   return (
-    <div className="relative w-full max-w-xl mx-auto">
+    <div data-testid="agent-orchestrator" className="relative w-full max-w-xl mx-auto">
       {/* Glassmorphic container */}
       <div className="relative bg-[#1A1A1E]/40 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-2xl">
         {/* Header */}
@@ -38,10 +28,10 @@ export function AgentOrchestrator() {
               <Activity className="h-5 w-5 text-[#00F5FF]" />
             </div>
             <div>
-              <h3 style={{ fontFamily: 'Inter Tight, sans-serif' }}>
+              <h3 className="font-inter-tight">
                 Orchestrator Agent
               </h3>
-              <p className="text-sm text-gray-500" style={{ fontFamily: 'Inter, sans-serif' }}>
+              <p className="text-sm text-gray-500 font-inter">
                 Multi-Agent Workflow
               </p>
             </div>
@@ -58,10 +48,10 @@ export function AgentOrchestrator() {
         <div className="relative flex flex-col items-center gap-8 py-6">
           {/* Orchestrator Hub */}
           <motion.div
-            animate={{ 
+            animate={{
               scale: [1, 1.05, 1],
             }}
-            transition={{ 
+            transition={{
               duration: 2,
               repeat: Infinity,
               ease: "easeInOut"
@@ -73,11 +63,11 @@ export function AgentOrchestrator() {
             </div>
             {/* Pulse rings */}
             <motion.div
-              animate={{ 
+              animate={{
                 scale: [1, 1.5, 1],
                 opacity: [0.5, 0, 0.5]
               }}
-              transition={{ 
+              transition={{
                 duration: 2,
                 repeat: Infinity,
                 ease: "easeOut"
@@ -88,32 +78,32 @@ export function AgentOrchestrator() {
 
           {/* Connecting Lines & Agent Cards */}
           <div className="grid grid-cols-3 gap-4 w-full">
-            {agents.map((agent, index) => {
+            {agents.map((agent) => {
               const Icon = agent.icon;
-              const isActive = index === activeAgent;
-              
+              const isProcessing = agent.status === 'processing';
+
               return (
                 <motion.div
                   key={agent.id}
                   animate={{
-                    scale: isActive ? 1.05 : 1,
-                    borderColor: isActive ? agent.color : 'rgba(255,255,255,0.1)'
+                    scale: isProcessing ? 1.05 : 1,
+                    borderColor: isProcessing ? agent.color : 'rgba(255,255,255,0.1)'
                   }}
                   className="relative bg-[#0A0A0B]/60 backdrop-blur-sm border rounded-xl p-4 transition-all"
                 >
                   {/* Connection line to orchestrator */}
-                  <svg 
+                  <svg
                     className="absolute -top-12 left-1/2 -translate-x-1/2 w-1 h-12"
                     style={{ overflow: 'visible' }}
                   >
                     <motion.line
                       x1="2" y1="0" x2="2" y2="48"
-                      stroke={isActive ? agent.color : 'rgba(255,255,255,0.2)'}
+                      stroke={isProcessing ? agent.color : 'rgba(255,255,255,0.2)'}
                       strokeWidth="2"
                       strokeDasharray="4 4"
                       animate={{
-                        strokeDashoffset: isActive ? [0, -8] : 0,
-                        opacity: isActive ? 1 : 0.3
+                        strokeDashoffset: isProcessing ? [0, -8] : 0,
+                        opacity: isProcessing ? 1 : 0.3
                       }}
                       transition={{
                         strokeDashoffset: {
@@ -127,9 +117,9 @@ export function AgentOrchestrator() {
 
                   {/* Agent Icon */}
                   <div className="flex justify-center mb-2">
-                    <div 
+                    <div
                       className="h-12 w-12 rounded-lg flex items-center justify-center"
-                      style={{ 
+                      style={{
                         backgroundColor: `${agent.color}20`,
                       }}
                     >
@@ -139,27 +129,38 @@ export function AgentOrchestrator() {
 
                   {/* Agent Info */}
                   <div className="text-center space-y-1">
-                    <p className="text-xs" style={{ fontFamily: 'Inter Tight, sans-serif' }}>
+                    <p className="text-xs font-inter-tight">
                       {agent.name}
                     </p>
-                    <p className="text-xs text-gray-500" style={{ fontFamily: 'Inter, sans-serif' }}>
+                    <p className="text-xs text-gray-500 font-inter">
                       {agent.role}
                     </p>
                   </div>
 
                   {/* Status indicator */}
-                  <div className="mt-2 flex justify-center">
-                    {isActive && (
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        className="flex items-center gap-1 text-xs"
-                        style={{ color: agent.color, fontFamily: 'JetBrains Mono, monospace' }}
-                      >
-                        <div className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ backgroundColor: agent.color }} />
-                        Processing
-                      </motion.div>
-                    )}
+                  <div className="mt-2 flex justify-center" style={{ height: '1.5rem' }}>
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="flex items-center gap-1 text-xs"
+                      style={{ color: agent.color, fontFamily: 'JetBrains Mono, monospace' }}
+                    >
+                      {agent.status === 'processing' && (
+                        <>
+                          <div className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ backgroundColor: agent.color }} />
+                          Processing
+                        </>
+                      )}
+                      {agent.status === 'complete' && (
+                        <>
+                          <CheckCircle2 className="h-3 w-3" />
+                          Complete
+                        </>
+                      )}
+                      {agent.status === 'idle' && (
+                        <span className="text-gray-500">Idle</span>
+                      )}
+                    </motion.div>
                   </div>
                 </motion.div>
               );
@@ -170,7 +171,7 @@ export function AgentOrchestrator() {
         {/* A2A Protocol Footer */}
         <div className="mt-6 pt-4 border-t border-white/10">
           <div className="flex items-center justify-between text-xs">
-            <span className="text-gray-500" style={{ fontFamily: 'Inter, sans-serif' }}>
+            <span className="text-gray-500 font-inter">
               A2A Protocol v2.1
             </span>
             <div className="flex items-center gap-2">
