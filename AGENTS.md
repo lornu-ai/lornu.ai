@@ -26,3 +26,9 @@ This satellite repository hosts the Lornu AI web application frontend.
 ## Related Repositories
 - **[private-lornu-ai](https://github.com/lornu-ai/private-lornu-ai)**: Hub repository (deployment manifests, Flux Kustomizations)
 
+## Pull Request Policy
+
+**Do not merge PRs with failing checks or merge conflicts.** All PRs must:
+- Pass all CI/CD checks
+- Have no merge conflicts
+- Be reviewed and approved before merging
