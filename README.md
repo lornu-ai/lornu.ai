@@ -8,4 +8,9 @@
   Run `npm i` to install the dependencies.
 
   Run `npm run dev` to start the development server.
-  
+## Pull Request Policy
+
+**Do not merge PRs with failing checks or merge conflicts.** All PRs must:
+- Pass all CI/CD checks
+- Have no merge conflicts
+- Be reviewed and approved before merging  
