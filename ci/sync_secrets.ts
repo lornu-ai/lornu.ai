@@ -23,6 +23,8 @@ interface SecretConfig {
   accessorServiceAccount?: string; // SA in accessor project that needs access
   value?: string; // If provided, use this; otherwise read from env
   envVar?: string; // Environment variable name (defaults to secret name)
+  k8sSecretName?: string; // Kubernetes secret name (for GSM-to-K8s sync)
+  k8sNamespace?: string; // Kubernetes namespace (default: lornu-ai)
 }
 
 interface SyncConfig {
@@ -195,8 +197,44 @@ async function grantCrossProjectAccess(
   }
 }
 
+async function syncToKubernetes(
+  projectId: string,
+  gsmSecretName: string,
+  k8sSecretName: string,
+  k8sNamespace: string,
+  dryRun: boolean
+): Promise<void> {
+  if (dryRun) {
+    console.log(`[DRY RUN] Would sync to K8s: ${k8sSecretName} in namespace ${k8sNamespace}`);
+    return;
+  }
+
+  console.log(`🔄 Syncing to Kubernetes: ${k8sSecretName} in ${k8sNamespace}`);
+
+  // Fetch secret from GSM
+  const secretValue = await $`gcloud secrets versions access latest --secret=${gsmSecretName} --project=${projectId}`.text();
+
+  // Create or update K8s secret (using stdin to avoid exposing value in command line)
+  const secretYaml = `
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${k8sSecretName}
+  namespace: ${k8sNamespace}
+  labels:
+    lornu.ai/managed-by: sync-secrets
+    lornu.ai/source: gsm
+type: Opaque
+stringData:
+  value: "${secretValue.trim().replace(/"/g, '\\"')}"
+`;
+
+  await $`echo ${secretYaml} | kubectl apply -f -`.quiet();
+  console.log(`✅ K8s secret synced: ${k8sSecretName}`);
+}
+
 async function syncSecret(config: SecretConfig, dryRun: boolean): Promise<void> {
-  const { name, projectId, accessorProjectId, accessorServiceAccount, value, envVar } = config;
+  const { name, projectId, accessorProjectId, accessorServiceAccount, value, envVar, k8sSecretName, k8sNamespace } = config;
   
   // Get secret value
   const secretValue = value || process.env[envVar || name];
@@ -226,7 +264,12 @@ async function syncSecret(config: SecretConfig, dryRun: boolean): Promise<void> 
     console.log(`\n💡 To access this secret from ${accessorProjectId}, use:`);
     console.log(`   projects/${projectId}/secrets/${name}/versions/latest`);
   }
-  
+
+  // Sync to Kubernetes if configured
+  if (k8sSecretName) {
+    await syncToKubernetes(projectId, name, k8sSecretName, k8sNamespace || "lornu-ai", dryRun);
+  }
+
   console.log(`✅ Secret synced successfully: ${name}\n`);
 }
 
