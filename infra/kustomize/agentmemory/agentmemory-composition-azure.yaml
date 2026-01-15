@@ -1,0 +1,136 @@
+# AgentMemory Composition for Azure
+# Creates Azure Database for PostgreSQL Flexible Server
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: agentmemory-azure-postgres
+  labels:
+    lornu.ai/managed-by: crossplane
+    lornu.ai/component: agentmemory
+    lornu.ai/provider: azure
+spec:
+  compositeTypeRef:
+    apiVersion: lornu.ai/v1alpha1
+    kind: XAgentMemory
+
+  writeConnectionSecretsToNamespace: crossplane-system
+
+  patchSets:
+    - name: common-fields
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.region
+          toFieldPath: spec.forProvider.location
+        - type: FromCompositeFieldPath
+          fromFieldPath: metadata.labels
+          toFieldPath: metadata.labels
+
+  resources:
+    # Resource Group for the database
+    - name: resource-group
+      base:
+        apiVersion: azure.upbound.io/v1beta1
+        kind: ResourceGroup
+        spec:
+          forProvider:
+            location: eastus2
+          providerConfigRef:
+            name: default
+      patches:
+        - type: PatchSet
+          patchSetName: common-fields
+        - type: FromCompositeFieldPath
+          fromFieldPath: metadata.name
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "rg-%s"
+
+    # PostgreSQL Flexible Server
+    - name: postgres-server
+      base:
+        apiVersion: dbforpostgresql.azure.upbound.io/v1beta1
+        kind: FlexibleServer
+        spec:
+          forProvider:
+            location: eastus2
+            version: "15"
+            skuName: B_Standard_B1ms  # Burstable, 1 vCore
+            storageMb: 32768          # 32GB default
+            administratorLogin: lornuadmin
+            administratorPasswordSecretRef:
+              namespace: crossplane-system
+              name: postgres-admin-password
+              key: password
+            resourceGroupNameSelector:
+              matchControllerRef: true
+          providerConfigRef:
+            name: default
+          writeConnectionSecretToRef:
+            namespace: crossplane-system
+      patches:
+        - type: PatchSet
+          patchSetName: common-fields
+        - type: FromCompositeFieldPath
+          fromFieldPath: metadata.name
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "psql-%s"
+        - type: FromCompositeFieldPath
+          fromFieldPath: metadata.name
+          toFieldPath: spec.writeConnectionSecretToRef.name
+          transforms:
+            - type: string
+              string:
+                fmt: "%s-conn"
+        # Map size to storage
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.size
+          toFieldPath: spec.forProvider.storageMb
+          transforms:
+            - type: map
+              map:
+                small: "10240"    # 10GB
+                medium: "51200"   # 50GB
+                large: "102400"   # 100GB
+        # Map tier to SKU
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.tier
+          toFieldPath: spec.forProvider.skuName
+          transforms:
+            - type: map
+              map:
+                standard: B_Standard_B1ms
+                premium: GP_Standard_D2s_v3
+        # Propagate connection details
+        - type: ToCompositeFieldPath
+          fromFieldPath: status.atProvider.fqdn
+          toFieldPath: status.endpoint
+        - type: ToCompositeFieldPath
+          fromFieldPath: spec.writeConnectionSecretToRef.name
+          toFieldPath: status.connectionSecret
+
+    # PostgreSQL Database
+    - name: postgres-database
+      base:
+        apiVersion: dbforpostgresql.azure.upbound.io/v1beta1
+        kind: FlexibleServerDatabase
+        spec:
+          forProvider:
+            charset: UTF8
+            collation: en_US.utf8
+            serverIdSelector:
+              matchControllerRef: true
+          providerConfigRef:
+            name: default
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: metadata.name
+          toFieldPath: metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "db-%s"

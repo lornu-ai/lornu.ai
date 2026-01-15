@@ -138,6 +138,32 @@ apply-dry-run env="dev":
     cd infra && LORNU_ENV={{env}} bun run apply:dry-run
 
 # ============================================
+# Crossplane (Azure Provider Bootstrap)
+# ============================================
+
+# Bootstrap Crossplane with Azure provider (LIVE)
+crossplane-bootstrap: check-auth scan-secrets
+    @echo "Bootstrapping Crossplane with Azure provider..."
+    bun ci/crossplane-bootstrap.ts
+
+# Bootstrap Crossplane (dry-run validation only)
+crossplane-dry-run: scan-secrets
+    @echo "Validating Crossplane bootstrap (dry-run)..."
+    bun ci/crossplane-bootstrap.ts --dry-run
+
+# Validate Kustomize manifests (no cluster required)
+crossplane-validate:
+    @echo "Validating Crossplane Kustomize manifests..."
+    kubectl kustomize infra/kustomize/crossplane > /dev/null && echo "crossplane/ OK"
+    kubectl kustomize infra/kustomize/agentmemory > /dev/null && echo "agentmemory/ OK"
+    kubectl kustomize infra/kustomize/apps > /dev/null && echo "apps/ OK"
+    @echo "All manifests valid!"
+
+# Apply AgentMemory claim example
+crossplane-claim: check-auth
+    kubectl apply -f examples/agentmemory-claim.yaml
+
+# ============================================
 # CI/CD
 # ============================================
 

@@ -1,0 +1,12 @@
+# AgentMemory Kustomization
+# Includes XRD and Compositions for agent memory provisioning
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - agentmemory-xrd.yaml
+  - agentmemory-composition-azure.yaml
+
+commonLabels:
+  lornu.ai/managed-by: kustomize
+  lornu.ai/component: agentmemory

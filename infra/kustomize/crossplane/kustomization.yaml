@@ -1,0 +1,13 @@
+# Crossplane Operator Install (Kustomize-only, no Helm)
+# References the official Crossplane install manifest
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  # Crossplane upstream install manifest (v1.14.0)
+  - https://github.com/crossplane/crossplane/releases/download/v1.14.0/crossplane.yaml
+
+# Common labels for all Crossplane resources
+commonLabels:
+  lornu.ai/managed-by: kustomize
+  lornu.ai/component: crossplane
