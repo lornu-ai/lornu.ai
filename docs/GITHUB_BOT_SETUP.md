@@ -2,243 +2,258 @@
 
 This guide helps you set up a GitHub bot account for automated PR approvals and other GitHub operations.
 
-## Option 1: GitHub App (Recommended)
+## Quick Start (Automated Setup)
 
-GitHub Apps are the recommended approach for bot accounts because they:
-- Have fine-grained permissions
-- Are more secure than Personal Access Tokens
-- Can be installed on specific repositories or organizations
-- Support JWT authentication
+Use the automated setup script for a guided experience:
 
-### Step 1: Create a GitHub App
+```bash
+# Run the interactive setup wizard
+bun scripts/automated-github-bot-setup.ts --org lornu-ai --name lornu-ai-bot
 
-1. Go to your GitHub organization settings (or personal account settings)
-2. Navigate to **Developer settings** → **GitHub Apps**
-3. Click **New GitHub App**
-4. Fill in the app details:
-   - **GitHub App name**: `lornu-ai-bot` (or your preferred name)
-   - **Homepage URL**: `https://lornu.ai` (or your org URL)
-   - **Webhook**: Leave unchecked (unless you need webhooks)
-   - **Callback URL**: Leave empty
-   - **Expire user authorization tokens**: Unchecked
+# Or with GCP Secret Manager integration
+bun scripts/automated-github-bot-setup.ts \
+  --org lornu-ai \
+  --name lornu-ai-bot \
+  --project YOUR_GCP_PROJECT_ID
+```
 
-### Step 2: Set Permissions
+The wizard will:
+1. Generate a manifest URL for one-click app registration
+2. Guide you through the browser-based setup
+3. Upload credentials to GCP Secret Manager (optional)
+4. Test the configuration
 
-Under **Permissions**, configure:
+## Manual Setup
 
-**Repository permissions:**
-- **Pull requests**: `Read and write` (required for approvals)
-- **Contents**: `Read` (optional, for reading PR diffs)
-- **Metadata**: `Read-only` (always enabled)
+### Step 1: Generate GitHub App Manifest URL
 
-**Organization permissions:**
-- Leave as default unless you need organization-level access
+Use `create-manifest.ts` to generate a registration URL with exact permissions:
+
+```bash
+cd ai-agents/github-bot-tools-ts
+bun install
+
+# Generate manifest URL
+bun src/bin/create-manifest.ts --org lornu-ai --name lornu-ai-bot
+```
+
+This outputs a URL that creates a GitHub App with:
+- `pull_requests: write` - Approve/review PRs
+- `contents: read` - Read repository files
+- `metadata: read` - Read repository metadata
+- `issues: write` - Comment on issues
+- `checks: write` - Create check runs
+- `statuses: write` - Set commit statuses
+
+### Step 2: Register the App
+
+1. Open the generated URL in your browser
+2. Review the app name and permissions
+3. Click **Create GitHub App**
+4. **Download the private key** (.pem file) - you can only download it once!
+5. Note the **App ID** from the app's About section
 
 ### Step 3: Install the App
 
-1. After creating the app, click **Install App**
-2. Choose **Only select repositories** or **All repositories**
-3. Select the repositories where the bot should operate:
+1. In your GitHub App settings, click **Install App**
+2. Choose **lornu-ai** organization
+3. Select repositories:
    - `lornu-ai/lornu.ai`
    - `lornu-ai/private-lornu-ai`
-   - Any other repos you need
+4. Note the **Installation ID** from the URL (e.g., `/settings/installations/12345678`)
 
-### Step 4: Generate Private Key
+### Step 4: Store Credentials in GCP Secret Manager
 
-1. In your GitHub App settings, scroll to **Private keys**
-2. Click **Generate a private key**
-3. **Save the `.pem` file securely** - you can only download it once!
-4. Store it in a secure location (e.g., GCP Secret Manager, AWS Secrets Manager)
-
-### Step 5: Get App Credentials
-
-You'll need:
-- **App ID**: Found in the app's "About" section
-- **Installation ID**: Found after installing the app (in the installation URL or via API)
-- **Private Key**: The `.pem` file you downloaded
-
-### Step 6: Test the Setup
+Use `upload-secrets.ts` to securely store your credentials:
 
 ```bash
-# Generate an installation token
-cd ai-agents/github-bot-tools-ts
-
-export GITHUB_APP_ID="123456"  # Your app ID
-export GITHUB_APP_PRIVATE_KEY_PATH="./private-key.pem"  # Path to your .pem file
-export GITHUB_APP_INSTALLATION_ID="789012"  # Your installation ID
-
-bun src/bin/generate-github-app-token.ts --output /tmp/github-bot-token
-
-# Test approving a PR
-export GITHUB_TOKEN="$(cat /tmp/github-bot-token)"
-export GITHUB_REPOSITORY="lornu-ai/lornu.ai"
-
-bun src/bin/approve-prs-with-bot.ts --pr-number 29
+bun src/bin/upload-secrets.ts \
+  --project YOUR_GCP_PROJECT_ID \
+  --app-id 123456 \
+  --installation-id 78901234 \
+  --private-key-file ./lornu-ai-bot.pem
 ```
 
-## Option 2: Personal Access Token (Classic)
+This creates three secrets:
+- `lornu-github-app-id`
+- `lornu-github-app-installation-id`
+- `lornu-github-app-private-key`
+
+### Step 5: Test the Setup
+
+Generate an installation token:
+
+```bash
+# TypeScript/Bun
+TOKEN=$(bun src/bin/generate-github-app-token.ts \
+  --app-id 123456 \
+  --private-key ./lornu-ai-bot.pem \
+  --installation-id 78901234)
+
+# Or Rust (faster)
+TOKEN=$(cargo run --bin get-token -p github-bot -- \
+  --app-id 123456 \
+  --private-key-path ./lornu-ai-bot.pem \
+  --installation-id 78901234)
+```
+
+Approve a PR:
+
+```bash
+# TypeScript/Bun
+bun src/bin/approve-prs-with-bot.ts \
+  --repo lornu-ai/lornu.ai \
+  --token "$TOKEN" \
+  --pr-number 29
+
+# Or Rust
+cargo run --bin approve-pr -p github-bot -- \
+  --repo lornu-ai/lornu.ai \
+  --token "$TOKEN" \
+  --pr-number 29
+```
+
+## Tools Reference
+
+### TypeScript/Bun Tools (`ai-agents/github-bot-tools-ts/`)
+
+| Tool | Purpose |
+|------|---------|
+| `create-manifest.ts` | Generate GitHub App registration URL |
+| `upload-secrets.ts` | Upload credentials to GCP Secret Manager |
+| `generate-github-app-token.ts` | Generate installation access token |
+| `approve-prs-with-bot.ts` | Approve PRs with bot account |
+
+### Rust Tools (`services/github-bot/`)
+
+| Binary | Purpose |
+|--------|---------|
+| `get-token` | Generate installation access token (faster) |
+| `approve-pr` | Approve PRs with bot account |
+
+### Environment Variables
+
+```bash
+# GitHub App credentials
+GITHUB_APP_ID=123456
+GITHUB_APP_PRIVATE_KEY_PATH=./private-key.pem
+GITHUB_APP_INSTALLATION_ID=78901234
+
+# GCP (for secret management)
+GCP_PROJECT_ID=your-project-id
+
+# For PR operations
+GITHUB_REPOSITORY=lornu-ai/lornu.ai
+GITHUB_TOKEN=<generated-token>
+```
+
+## CI/CD Integration
+
+### GitHub Actions
+
+```yaml
+jobs:
+  approve-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+
+      - name: Generate Bot Token
+        id: token
+        run: |
+          cd ai-agents/github-bot-tools-ts
+          bun install
+          TOKEN=$(bun src/bin/generate-github-app-token.ts \
+            --app-id ${{ secrets.GITHUB_APP_ID }} \
+            --private-key ${{ secrets.GITHUB_APP_PRIVATE_KEY }} \
+            --installation-id ${{ secrets.GITHUB_APP_INSTALLATION_ID }})
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Approve PR
+        run: |
+          cd ai-agents/github-bot-tools-ts
+          bun src/bin/approve-prs-with-bot.ts \
+            --repo ${{ github.repository }} \
+            --token ${{ steps.token.outputs.token }} \
+            --pr-number ${{ github.event.pull_request.number }}
+```
+
+### Flux/GitOps Integration
+
+For GitOps workflows, store secrets using External Secrets Operator (ESO):
+
+```yaml
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: github-bot-credentials
+  namespace: flux-system
+spec:
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: gcp-secrets-manager
+  target:
+    name: github-bot-credentials
+  data:
+    - secretKey: app-id
+      remoteRef:
+        key: lornu-github-app-id
+    - secretKey: installation-id
+      remoteRef:
+        key: lornu-github-app-installation-id
+    - secretKey: private-key
+      remoteRef:
+        key: lornu-github-app-private-key
+```
+
+## Alternative: Personal Access Token
 
 If you prefer a simpler setup without GitHub Apps:
 
-### Step 1: Create a Bot User Account
-
-1. Create a new GitHub account (e.g., `lornu-ai-bot`)
-2. Add it to your organization as a member
-3. Grant appropriate permissions
-
-### Step 2: Generate a Classic PAT
-
-1. Log in as the bot user
-2. Go to **Settings** → **Developer settings** → **Personal access tokens** → **Tokens (classic)**
-3. Click **Generate new token (classic)**
-4. Set expiration (or no expiration for bots)
-5. Select scopes:
-   - ✅ `repo` (Full control of private repositories)
-   - ✅ `write:org` (if needed for organization operations)
-
-### Step 3: Store the Token Securely
+1. Create a bot user account (e.g., `lornu-ai-bot`)
+2. Generate a Personal Access Token with `repo` scope
+3. Use the token directly with `approve-prs-with-bot.ts`:
 
 ```bash
-# Store in GCP Secret Manager
-gcloud secrets create github-bot-token \
-  --data-file=- \
-  --project=YOUR_PROJECT
-
-# Or store in environment variable (for local testing)
-export GITHUB_TOKEN="ghp_..."
+bun src/bin/approve-prs-with-bot.ts \
+  --repo lornu-ai/lornu.ai \
+  --token ghp_your_token_here \
+  --pr-number 29
 ```
 
-### Step 4: Test the Setup
-
-```bash
-cd ai-agents/github-bot-tools-ts
-
-export GITHUB_TOKEN="ghp_..."  # Bot user's PAT
-export GITHUB_REPOSITORY="lornu-ai/lornu.ai"
-
-bun src/bin/approve-prs-with-bot.ts --pr-number 29
-```
-
-## Option 3: Fine-Grained Personal Access Token
-
-GitHub also supports fine-grained PATs (newer, more secure):
-
-1. Go to **Settings** → **Developer settings** → **Personal access tokens** → **Fine-grained tokens**
-2. Click **Generate new token**
-3. Configure:
-   - **Token name**: `lornu-ai-bot`
-   - **Expiration**: Set as needed
-   - **Repository access**: Select specific repos
-   - **Permissions**: 
-     - Repository permissions: `Pull requests: Write`
-     - Account permissions: None (unless needed)
-
-## Storing Credentials Securely
-
-### GCP Secret Manager (Recommended)
-
-```bash
-# Store GitHub App credentials
-gcloud secrets create github-app-id --data-file=- --project=YOUR_PROJECT <<< "123456"
-gcloud secrets create github-app-installation-id --data-file=- --project=YOUR_PROJECT <<< "789012"
-gcloud secrets create github-app-private-key --data-file=- --project=YOUR_PROJECT < private-key.pem
-
-# Or store PAT
-gcloud secrets create github-bot-token --data-file=- --project=YOUR_PROJECT <<< "ghp_..."
-```
-
-### Environment Variables (Local Development)
-
-Create a `.env` file (add to `.gitignore`):
-
-```bash
-# GitHub App
-GITHUB_APP_ID=123456
-GITHUB_APP_PRIVATE_KEY_PATH=/path/to/private-key.pem
-GITHUB_APP_INSTALLATION_ID=789012
-
-# Or Personal Access Token
-GITHUB_TOKEN=ghp_...
-```
-
-## Finding Your Installation ID
-
-If you installed a GitHub App, find the installation ID:
-
-```bash
-# Using GitHub CLI
-gh api /app/installations | jq '.[] | {id: .id, account: .account.login}'
-
-# Or via API
-curl -H "Authorization: Bearer YOUR_JWT" \
-  https://api.github.com/app/installations
-```
-
-The installation ID is in the response JSON.
+Note: GitHub Apps are recommended for better security and fine-grained permissions.
 
 ## Troubleshooting
 
 ### "Cannot approve your own pull request"
 
-- Make sure you're using a **different** GitHub account than the PR author
+- Ensure you're using the bot's token, not your personal token
+- The GitHub App must be a different identity than the PR author
 - For GitHub Apps, ensure the app is installed and you're using the installation token
 - Check that the token has `pull_requests: write` permission
 
 ### "Resource not accessible by integration"
 
-- The GitHub App needs to be installed on the repository
+- Install the GitHub App on the repository
 - Check installation settings in the app's "Install App" section
 
 ### "Bad credentials"
 
-- Verify your App ID, Installation ID, and private key are correct
-- Ensure the private key file is readable and in PEM format
-- Check that the JWT is being generated correctly
+- Verify App ID, Installation ID, and private key are correct
+- Ensure the private key is in PEM format
+- JWT tokens expire after 10 minutes - generate a fresh token
 
 ### "Installation not found"
 
-- Verify the installation ID matches the installation in your organization
-- Ensure the app is installed on the repository you're trying to access
-
-## Quick Setup Script
-
-Save this as `setup-github-bot.sh`:
-
-```bash
-#!/bin/bash
-set -euo pipefail
-
-echo "🔧 Setting up GitHub Bot Account"
-echo ""
-
-# Check if using GitHub App or PAT
-if [ -z "${GITHUB_APP_ID:-}" ]; then
-  echo "Using Personal Access Token method"
-  echo "Set GITHUB_TOKEN environment variable"
-else
-  echo "Using GitHub App method"
-  echo "App ID: ${GITHUB_APP_ID}"
-  echo "Installation ID: ${GITHUB_APP_INSTALLATION_ID:-<not set>}"
-  echo "Private Key: ${GITHUB_APP_PRIVATE_KEY_PATH:-<not set>}"
-fi
-
-echo ""
-echo "✅ Setup complete!"
-echo ""
-echo "Test with:"
-echo "  bun src/bin/approve-prs-with-bot.ts --pr-number <PR_NUMBER>"
-```
-
-## Next Steps
-
-1. Set up the bot account using one of the methods above
-2. Store credentials securely (GCP Secret Manager recommended)
-3. Test with a PR approval
-4. Integrate into your CI/CD pipeline
+- Verify the installation ID matches your organization
+- Ensure the app is installed on the target repository
 
 ## Related
 
 - [GitHub Apps Documentation](https://docs.github.com/en/apps)
 - [Personal Access Tokens Documentation](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token)
-- `ai-agents/github-bot-tools-ts/` - TypeScript/Bun bot tools
-- `ai-agents/github-bot-tools/` - Rust bot tools (in private-lornu-ai)
+- Issues: #24, #60, #61
+- PR: #29, #63
