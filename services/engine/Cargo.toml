@@ -50,6 +50,18 @@ cloudflare = "0.12"
 # Base64 encoding for Secret Manager payloads
 base64 = "0.22"
 
+# OpenAI client for embeddings
+async-openai = "0.21"
+
+# Qdrant vector database client
+qdrant-client = "1.11"
+
+# Git operations
+git2 = "0.18"
+
+# Chrono for timestamps
+chrono = { version = "0.4", features = ["serde"] }
+
 [[bin]]
 name = "engine"
 path = "src/main.rs"
