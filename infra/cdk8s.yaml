@@ -1,0 +1,34 @@
+# CDK8s Configuration for Lornu AI Infrastructure
+# The only YAML file in this entire infra setup (ironic, but necessary)
+
+language: typescript
+app: bun run main.ts
+
+# Import Crossplane CRDs for type-safe infrastructure
+imports:
+  # Core Crossplane
+  - k8s
+
+  # GCP Provider (Primary Hub)
+  - github:crossplane-contrib/provider-gcp/package/crds
+
+  # AWS Provider (Secondary Hub)
+  - github:crossplane-contrib/provider-aws/package/crds
+
+  # Azure Provider (Tertiary Hub)
+  - github:crossplane-contrib/provider-azure/package/crds
+
+  # Kubernetes Provider (for in-cluster resources)
+  - github:crossplane-contrib/provider-kubernetes/package/crds
+
+  # Helm Provider (for legacy charts during migration)
+  - github:crossplane-contrib/provider-helm/package/crds
+
+  # Flux GitOps CRDs
+  - github:fluxcd/flux2/manifests/crds
+
+  # External Secrets Operator
+  - github:external-secrets/external-secrets/config/crds/bases
+
+# Output directory for synthesized manifests (GitOps compatibility)
+output: dist/
