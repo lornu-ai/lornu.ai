@@ -165,6 +165,7 @@ async function runAgentPipeline(client: Client, source: Directory, branch: strin
     .from("rust:1.83-slim")
     .withMountedDirectory("/src", source)
     .withWorkdir("/src")
+    .withExec(["cargo", "update"])  // Refresh registry to avoid stale cache issues
     .withExec(["cargo", "build", "--release", "--bin", agentName]);
 
   await agentBuild.stdout();
@@ -208,6 +209,7 @@ async function runTrunkPipeline(client: Client, source: Directory): Promise<void
     .from("rust:1.83-slim")
     .withMountedDirectory("/src", source)
     .withWorkdir("/src/services")
+    .withExec(["cargo", "update"])  // Refresh registry to avoid stale cache issues
     .withExec(["cargo", "build", "--release"]);
 
   await rustRelease.stdout();
