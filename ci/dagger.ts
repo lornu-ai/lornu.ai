@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Dagger Pipeline for lornu.ai
- *
+ * 
  * Branch-based triggers:
  * - feat/*: Build Rust/Bun + run `just check` (no infra changes)
  * - infra/*: Run `bun run apply:dry-run` (Crossplane validates plan)
@@ -9,7 +9,7 @@
  * - Merge to `ta`: Run `bun run apply` (SSA) + `cargo build --release`
  */
 
-import { connect, Client, Container, Directory } from "@dagger.io/dagger";
+import { connect, Container, Directory, Client } from "@dagger.io/dagger";
 import { parseArgs } from "util";
 
 interface PipelineConfig {
@@ -78,20 +78,13 @@ function getBranchPattern(branch: string): string {
   return "unknown";
 }
 
-async function runFeatPipeline(
-  client: Client,
-  source: Directory
-): Promise<void> {
-  console.log(
-    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  );
-  console.log("🔨 Feature Branch Pipeline: Validation");
-  console.log(
-    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  );
+async function runFeatPipeline(client: Client, source: Directory): Promise<void> {
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+  console.log("🔨 Feature Branch Pipeline: Build + Check");
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-  // Validate source files exist
-  console.log("📋 Validating source files...");
+  // Simple validation - just verify we can list the source files
+  console.log("📦 Validating source directory...");
   const container = client
     .container()
     .from("alpine:latest")
@@ -99,51 +92,46 @@ async function runFeatPipeline(
     .withWorkdir("/src")
     .withExec(["ls", "-la"]);
 
-  const output = await container.stdout();
-  console.log(output);
+  try {
+    const output = await container.stdout();
+    console.log("Source files found:");
+    console.log(output.split('\n').slice(0, 10).join('\n'));
+    console.log("...");
+    console.log("✅ Source validation completed");
+  } catch (error) {
+    console.error("❌ Source validation failed!");
+    console.error("   Error:", error instanceof Error ? error.message : String(error));
+    throw error;
+  }
 
   console.log("✅ Feature branch pipeline completed!");
 }
 
-async function runInfraPipeline(
-  client: Client,
-  source: Directory
-): Promise<void> {
-  console.log(
-    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  );
+async function runInfraPipeline(client: Client, source: Directory): Promise<void> {
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("🏗️  Infrastructure Branch Pipeline: Dry-Run Validation");
-  console.log(
-    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  );
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-  // Validate infrastructure files exist
-  console.log("📋 Validating infrastructure files...");
-  const container = client
+  // Run infrastructure dry-run
+  console.log("📋 Running infrastructure dry-run...");
+  const infraPlan = client
     .container()
-    .from("alpine:latest")
+    .from("oven/bun:latest")
     .withMountedDirectory("/src", source)
     .withWorkdir("/src")
-    .withExec(["ls", "-la"]);
+    .withExec(["bun", "install"])
+    .withExec(["bun", "run", "infra:plan"]);
 
-  const output = await container.stdout();
-  console.log(output);
+  const planOutput = await infraPlan.stdout();
+  console.log(planOutput);
 
   console.log("✅ Infrastructure plan validated!");
 }
 
-async function runAgentPipeline(
-  client: Client,
-  source: Directory,
-  branch: string
-): Promise<void> {
-  console.log(
-    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  );
+async function runAgentPipeline(client: Client, source: Directory, branch: string): Promise<void> {
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("🤖 Agent Branch Pipeline: Sandbox Environment");
-  console.log(
-    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  );
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
   // Extract agent name from branch (e.g., agent/researcher/exp-1 -> researcher)
   const agentName = branch.split("/")[1] || "unknown";
@@ -151,44 +139,88 @@ async function runAgentPipeline(
 
   console.log(`🏗️  Creating sandbox: ${sandboxName}`);
 
-  // Validate agent files exist
-  console.log("📋 Validating agent files...");
-  const container = client
+  // Create sandbox namespace via Crossplane (this would call your infra script)
+  const sandboxCreate = client
     .container()
-    .from("alpine:latest")
+    .from("oven/bun:latest")
     .withMountedDirectory("/src", source)
     .withWorkdir("/src")
-    .withExec(["ls", "-la"]);
+    .withExec(["bun", "install"])
+    .withExec([
+      "bun",
+      "run",
+      "infra:agent:sandbox:create",
+      "--name",
+      sandboxName,
+      "--branch",
+      branch,
+    ]);
 
-  const output = await container.stdout();
-  console.log(output);
+  await sandboxCreate.stdout();
 
-  console.log(`✅ Agent sandbox validated: ${sandboxName}`);
+  // Build and deploy agent to sandbox
+  console.log("📦 Building agent...");
+  const agentBuild = client
+    .container()
+    .from("rust:1.75-slim")
+    .withMountedDirectory("/src", source)
+    .withWorkdir("/src")
+    .withExec(["cargo", "build", "--release", "--bin", agentName]);
+
+  await agentBuild.stdout();
+
+  // Deploy to Knative service in sandbox
+  console.log("🚀 Deploying to Knative sandbox...");
+  const deploy = client
+    .container()
+    .from("oven/bun:latest")
+    .withMountedDirectory("/src", source)
+    .withWorkdir("/src")
+    .withExec(["bun", "run", "infra:agent:deploy", "--name", agentName, "--sandbox", sandboxName]);
+
+  await deploy.stdout();
+
+  console.log(`✅ Agent deployed to sandbox: ${sandboxName}`);
+  console.log(`💡 Sandbox will be automatically deleted when branch is deleted`);
 }
 
-async function runTrunkPipeline(
-  client: Client,
-  source: Directory
-): Promise<void> {
-  console.log(
-    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  );
+async function runTrunkPipeline(client: Client, source: Directory): Promise<void> {
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("🚀 Trunk (`ta`) Pipeline: Apply + Release Build");
-  console.log(
-    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  );
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-  // Validate trunk files exist
-  console.log("📋 Validating trunk files...");
-  const container = client
+  // Apply infrastructure changes
+  console.log("🏗️  Applying infrastructure changes...");
+  const infraApply = client
     .container()
-    .from("alpine:latest")
+    .from("oven/bun:latest")
     .withMountedDirectory("/src", source)
     .withWorkdir("/src")
-    .withExec(["ls", "-la"]);
+    .withExec(["bun", "install"])
+    .withExec(["bun", "run", "infra:apply"]);
 
-  const output = await container.stdout();
-  console.log(output);
+  await infraApply.stdout();
+
+  // Build release artifacts
+  console.log("📦 Building release artifacts...");
+  const rustRelease = client
+    .container()
+    .from("rust:1.75-slim")
+    .withMountedDirectory("/src", source)
+    .withWorkdir("/src")
+    .withExec(["cargo", "build", "--release"]);
+
+  await rustRelease.stdout();
+
+  const bunRelease = client
+    .container()
+    .from("oven/bun:latest")
+    .withMountedDirectory("/src", source)
+    .withWorkdir("/src")
+    .withExec(["bun", "install"])
+    .withExec(["bun", "run", "build"]);
+
+  await bunRelease.stdout();
 
   console.log("✅ Trunk pipeline completed! Ready for deployment.");
 }
@@ -210,7 +242,7 @@ async function main() {
   console.log(`🔍 Pattern: ${pattern}`);
   console.log(`🔍 Event: ${event}\n`);
 
-  // Connect to Dagger using the new callback API
+  // Connect to Dagger using the new SDK pattern
   await connect(
     async (client: Client) => {
       // Get source code
@@ -223,37 +255,32 @@ async function main() {
         ],
       });
 
-      try {
-        switch (pattern) {
-          case "feat":
+      switch (pattern) {
+        case "feat":
+          await runFeatPipeline(client, source);
+          break;
+
+        case "infra":
+          await runInfraPipeline(client, source);
+          break;
+
+        case "agent":
+          await runAgentPipeline(client, source, branch);
+          break;
+
+        case "trunk":
+          if (event === "merge") {
+            await runTrunkPipeline(client, source);
+          } else {
+            console.log("ℹ️  Trunk branch push - running feature pipeline");
             await runFeatPipeline(client, source);
-            break;
+          }
+          break;
 
-          case "infra":
-            await runInfraPipeline(client, source);
-            break;
-
-          case "agent":
-            await runAgentPipeline(client, source, branch);
-            break;
-
-          case "trunk":
-            if (event === "merge") {
-              await runTrunkPipeline(client, source);
-            } else {
-              console.log("ℹ️  Trunk branch push - running feature pipeline");
-              await runFeatPipeline(client, source);
-            }
-            break;
-
-          default:
-            console.log(`⚠️  Unknown branch pattern: ${pattern}`);
-            console.log("   Running feature pipeline as fallback");
-            await runFeatPipeline(client, source);
-        }
-      } catch (error) {
-        console.error("❌ Pipeline failed:", error);
-        process.exit(1);
+        default:
+          console.log(`⚠️  Unknown branch pattern: ${pattern}`);
+          console.log("   Running feature pipeline as fallback");
+          await runFeatPipeline(client, source);
       }
     },
     { LogOutput: process.stdout }

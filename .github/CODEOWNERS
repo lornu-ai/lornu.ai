@@ -1,5 +1,6 @@
 # CODEOWNERS for lornu.ai
 # Enforces ownership without complex branch naming
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 
 # Rust Engine
 /services/engine/ @engine-team
@@ -17,10 +18,6 @@
 /ci/ @infra-ops
 /ci/** @infra-ops
 /.github/workflows/ @infra-ops
-
-# Agents (experimental)
-/agents/ @agent-team
-/agents/** @agent-team
 
 # Root config files
 /Justfile @infra-ops
