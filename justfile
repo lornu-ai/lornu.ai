@@ -168,6 +168,45 @@ cherry-pick commit branch:
     cd services && cargo run -p lornu-engine -- --task cherry-pick --commit {{commit}} --branch {{branch}}
 
 # ============================================
+# Zero Trust Security Agent (Issue #52)
+# ============================================
+
+# Run Zero Trust IAM scan (requires ADC and QDRANT_URL)
+zero-trust-scan project:
+    @echo "Running Zero Trust IAM scan for project {{project}}..."
+    cd services && LORNU_GCP_PROJECT={{project}} cargo run -p lornu-engine -- --task zero-trust-scan
+
+# Run Zero Trust scan and generate remediation PR
+zero-trust-remediate project org="lornu-ai" repo="lornu.ai":
+    @echo "Running Zero Trust scan and creating remediation PR..."
+    cd services && \
+        LORNU_GCP_PROJECT={{project}} \
+        GITHUB_ORG={{org}} \
+        GITHUB_REPO={{repo}} \
+        cargo run -p lornu-engine -- --task zero-trust-remediate
+
+# Train Zero Trust agent on historical IAM changes
+train-zero-trust depth="50":
+    @echo "Training Zero Trust agent on IAM history..."
+    cd services && cargo run -p lornu-engine -- --task train-zero-trust --depth {{depth}}
+
+# List unused IAM roles via gcloud (90+ days inactive)
+list-unused-roles project:
+    @echo "Listing unused IAM roles for project {{project}}..."
+    gcloud recommender insights list \
+        --project={{project}} \
+        --insight-type=google.iam.policy.Insight \
+        --location=global \
+        --filter="stateInfo.state=ACTIVE" \
+        --format="table(name,insightSubtype,associatedRecommendations)"
+
+# Check secret ages in Secret Manager
+check-secret-ages project:
+    @echo "Checking secret ages in project {{project}}..."
+    gcloud secrets list --project={{project}} \
+        --format="table(name,createTime,replication.automatic)"
+
+# ============================================
 # CI/CD
 # ============================================
 
