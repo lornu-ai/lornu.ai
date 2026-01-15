@@ -180,8 +180,8 @@ function workflowToYAML(workflow: Workflow): string {
   for (const [jobName, job] of Object.entries(workflow.jobs)) {
     lines.push(`  ${jobName}:`);
     if (job.name) {
-      // Remove quotes from job name if it contains GitHub expressions
-      const nameValue = job.name.includes("${{") ? job.name : `"${job.name}"`;
+      // Quote job name if it contains GitHub expressions or special characters
+      const nameValue = job.name.includes("${{") ? `"${job.name}"` : `"${job.name}"`;
       lines.push(`    name: ${nameValue}`);
     }
     lines.push(`    runs-on: ${job["runs-on"]}`);

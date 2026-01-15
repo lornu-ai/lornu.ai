@@ -19,7 +19,7 @@ on:
 
 jobs:
   dagger-pipeline:
-    name: Dagger Pipeline: ${{ github.ref_name }}
+    name: "Dagger Pipeline: ${{ github.ref_name }}"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
