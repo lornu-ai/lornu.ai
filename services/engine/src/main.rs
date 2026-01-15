@@ -1,7 +1,7 @@
 //! Lornu AI Engine
 //!
-//! The core orchestration engine for Lornu AI agents.
-//! Manages agent lifecycles, provisions resources via Crossplane, and handles execution.
+//! Core orchestration engine with secure tool integrations.
+//! Uses ADC (Application Default Credentials) - no secrets in code.
 
 use anyhow::Result;
 use axum::{
@@ -12,21 +12,23 @@ use axum::{
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
-use tracing::{info, Level};
+use tracing::{info, warn, Level};
 use tracing_subscriber::FmtSubscriber;
 
 mod agents;
+mod tools;
 
 use agents::executor::CrossplaneExecutor;
+use tools::CloudflareTool;
 
 #[derive(Clone)]
 struct AppState {
     executor: Arc<CrossplaneExecutor>,
+    cloudflare: Option<Arc<CloudflareTool>>,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize logging
     FmtSubscriber::builder()
         .with_max_level(Level::INFO)
         .json()
@@ -37,18 +39,30 @@ async fn main() -> Result<()> {
     // Initialize Crossplane executor
     let executor = Arc::new(CrossplaneExecutor::new().await?);
 
-    let state = AppState { executor };
+    // Initialize Cloudflare tool (optional - requires LORNU_GCP_PROJECT)
+    let cloudflare = match CloudflareTool::new() {
+        Ok(tool) => {
+            info!("CloudflareTool initialized");
+            Some(Arc::new(tool))
+        }
+        Err(e) => {
+            warn!("CloudflareTool not available: {} (set LORNU_GCP_PROJECT to enable)", e);
+            None
+        }
+    };
 
-    // Build router
+    let state = AppState { executor, cloudflare };
+
     let app = Router::new()
         .route("/health", get(health_check))
         .route("/api/provision/memory", post(provision_memory))
         .route("/api/provision/worker", post(provision_worker))
         .route("/api/agents/status", get(agent_status))
+        .route("/api/dns/create", post(create_dns_record))
+        .route("/api/dns/list", get(list_dns_records))
         .layer(CorsLayer::permissive())
         .with_state(state);
 
-    // Start server
     let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
     info!("Engine listening on {}", addr);
 
@@ -144,6 +158,80 @@ async fn agent_status(State(state): State<AppState>) -> Json<serde_json::Value> 
         Ok(resources) => Json(serde_json::json!({
             "status": "ok",
             "resources": resources
+        })),
+        Err(e) => Json(serde_json::json!({
+            "status": "error",
+            "message": e.to_string()
+        })),
+    }
+}
+
+// ============================================================================
+// DNS Endpoints (CloudflareTool)
+// ============================================================================
+
+#[derive(serde::Deserialize)]
+struct CreateDnsRequest {
+    zone_id: Option<String>,
+    name: String,
+    content: String,
+    #[serde(default = "default_proxied")]
+    proxied: bool,
+}
+
+fn default_proxied() -> bool { true }
+
+async fn create_dns_record(
+    State(state): State<AppState>,
+    Json(req): Json<CreateDnsRequest>,
+) -> Json<serde_json::Value> {
+    let cloudflare = match &state.cloudflare {
+        Some(cf) => cf,
+        None => return Json(serde_json::json!({
+            "status": "error",
+            "message": "CloudflareTool not configured (set LORNU_GCP_PROJECT)"
+        })),
+    };
+
+    match cloudflare.create_dns_record(
+        req.zone_id.as_deref(),
+        &req.name,
+        &req.content,
+        req.proxied,
+    ).await {
+        Ok(record_id) => Json(serde_json::json!({
+            "status": "created",
+            "record_id": record_id,
+            "name": req.name
+        })),
+        Err(e) => Json(serde_json::json!({
+            "status": "error",
+            "message": e.to_string()
+        })),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct ListDnsRequest {
+    zone_id: Option<String>,
+}
+
+async fn list_dns_records(
+    State(state): State<AppState>,
+    axum::extract::Query(query): axum::extract::Query<ListDnsRequest>,
+) -> Json<serde_json::Value> {
+    let cloudflare = match &state.cloudflare {
+        Some(cf) => cf,
+        None => return Json(serde_json::json!({
+            "status": "error",
+            "message": "CloudflareTool not configured"
+        })),
+    };
+
+    match cloudflare.list_dns_records(query.zone_id.as_deref()).await {
+        Ok(records) => Json(serde_json::json!({
+            "status": "ok",
+            "records": records
         })),
         Err(e) => Json(serde_json::json!({
             "status": "error",

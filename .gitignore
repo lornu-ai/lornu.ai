@@ -39,12 +39,15 @@ bun.lockb
 bin/dagger
 # If you download the dagger binary locally via script
 
-# === Environment & Secrets ===
+# === Environment & Secrets (CRITICAL - Zero-Trust Policy) ===
 .env
 .env.*
 !.env.example
 *.pem
 *.key
+*.p12
+*.pfx
+
 # Block secret-related JSON files (but allow config JSONs)
 secrets.json
 **/secrets.json
@@ -55,6 +58,26 @@ secrets.json
 **/*password*.json
 # Allow example files
 !secrets.json.example
+
+# GCP Service Account Keys - NEVER commit these!
+# Use ADC (gcloud auth application-default login) instead
+*-credentials.json
+*-service-account.json
+**/credentials/*.json
+gcloud-*.json
+
+# AWS credentials
+.aws/
+credentials.csv
+
+# Azure credentials
+.azure/
+azure*.json
+
+# Terraform state (may contain secrets)
+*.tfstate
+*.tfstate.*
+.terraform/
 
 # === IDEs ===
 .vscode/
