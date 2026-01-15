@@ -52,6 +52,10 @@ octocrab = "0.41"
 # Base64 encoding for Secret Manager payloads
 base64 = "0.22"
 
+# Pin transitive dependency to version compatible with Rust 1.85
+# (home 0.5.12 requires Rust 1.88)
+home = "=0.5.9"
+
 [[bin]]
 name = "engine"
 path = "src/main.rs"
