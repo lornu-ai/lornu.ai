@@ -1,0 +1,15 @@
+# Example AgentMemory Claim
+# Creates a PostgreSQL database for agent memory storage
+apiVersion: lornu.ai/v1alpha1
+kind: AgentMemory
+metadata:
+  name: researcher-memory
+  namespace: lornu-ai
+  labels:
+    lornu.ai/agent: researcher
+    lornu.ai/managed-by: crossplane
+spec:
+  provider: azure
+  size: small      # 10Gi
+  tier: standard   # Burstable tier
+  region: eastus2
