@@ -96,21 +96,26 @@ async function main() {
   try {
     const args = parseArgs();
     
-    console.log("🔐 Generating JWT for GitHub App...");
+    // All log messages go to stderr so stdout only contains the token
+    console.error("🔐 Generating JWT for GitHub App...");
     const jwt = generateJWT(args.appId, args.privateKey);
     
-    console.log("🔑 Exchanging JWT for installation token...");
+    console.error("🔑 Exchanging JWT for installation token...");
     const token = await getInstallationToken(jwt, args.installationId);
     
     if (args.output) {
       const { writeFileSync } = await import("fs");
       writeFileSync(args.output, token, { mode: 0o600 });
-      console.log(`✅ Token saved to ${args.output}`);
+      console.error(`✅ Token saved to ${args.output}`);
     } else {
-      console.log("✅ Installation token:");
+      // Output only the token to stdout (for command substitution)
+      // All log messages already go to stderr via console.error
+      console.error("✅ Installation token:");
+      // Output token to stdout only - this is what gets captured by $()
       console.log(token);
     }
   } catch (error) {
+    // Errors go to stderr
     console.error("❌ Error:", error instanceof Error ? error.message : error);
     process.exit(1);
   }
