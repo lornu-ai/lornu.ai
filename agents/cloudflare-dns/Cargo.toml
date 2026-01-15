@@ -1,0 +1,35 @@
+[package]
+name = "cloudflare-dns"
+version = "0.1.0"
+edition = "2021"
+description = "Rust agent for Cloudflare DNS management with GSM secret injection"
+license = "MIT"
+repository = "https://github.com/lornu-ai/lornu.ai"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.35", features = ["full"] }
+
+# HTTP client
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Google Cloud Secret Manager
+gcloud-sdk = { version = "0.25", features = ["google-cloud-secretmanager-v1"] }
+
+# CLI
+clap = { version = "4.4", features = ["derive", "env"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+[dev-dependencies]
+tokio-test = "0.4"

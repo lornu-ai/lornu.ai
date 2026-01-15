@@ -1,0 +1,33 @@
+# Template PipelineRun - replace TIMESTAMP with actual value
+# Example: kubectl create -f - <<< "$(sed 's/TIMESTAMP/'$(date +%s)'/g' ci/tekton/pipelinerun-template.yaml)"
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  name: dagger-ci-run-TIMESTAMP
+  namespace: tekton-pipelines
+  labels:
+    lornu.ai/component: tekton
+    lornu.ai/managed-by: cdk8s
+    app.kubernetes.io/part-of: lornu-ai
+    tekton.dev/pipeline: dagger-ci
+spec:
+  pipelineRef:
+    name: dagger-ci
+  params:
+    - name: repo-url
+      value: https://github.com/lornu-ai/lornu.ai.git
+    - name: revision
+      value: feat/example-branch
+    - name: event
+      value: push
+    - name: base-branch
+      value: ""
+  workspaces:
+    - name: shared-workspace
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
