@@ -162,10 +162,9 @@ async function runAgentPipeline(client: Client, source: Directory, branch: strin
   console.log("📦 Building agent...");
   const agentBuild = client
     .container()
-    .from("rust:1.83-slim")
+    .from("rust:1.85-slim")
     .withMountedDirectory("/src", source)
     .withWorkdir("/src")
-    .withExec(["cargo", "update"])  // Refresh registry to avoid stale cache issues
     .withExec(["cargo", "build", "--release", "--bin", agentName]);
 
   await agentBuild.stdout();
@@ -206,10 +205,9 @@ async function runTrunkPipeline(client: Client, source: Directory): Promise<void
   console.log("📦 Building release artifacts...");
   const rustRelease = client
     .container()
-    .from("rust:1.83-slim")
+    .from("rust:1.85-slim")
     .withMountedDirectory("/src", source)
     .withWorkdir("/src/services")
-    .withExec(["cargo", "update"])  // Refresh registry to avoid stale cache issues
     .withExec(["cargo", "build", "--release"]);
 
   await rustRelease.stdout();
