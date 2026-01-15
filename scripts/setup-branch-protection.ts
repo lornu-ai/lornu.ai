@@ -80,8 +80,93 @@ const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 if (!GITHUB_TOKEN) {
   console.error("❌ Error: GITHUB_TOKEN environment variable is required");
   console.error("   Get a token from: https://github.com/settings/tokens");
-  console.error("   Required scopes: repo, admin:repo");
+  console.error("   Required scopes: repo, admin:repo (and admin:org for --create-teams)");
   process.exit(1);
+}
+
+async function checkTokenPermissions() {
+  console.log("🔍 Checking token permissions...\n");
+  
+  try {
+    // Check if we can read the repo (basic repo scope)
+    await octokit.repos.get({
+      owner,
+      repo,
+    });
+    console.log("✅ Repository read access: OK");
+
+    // Check if we can update repo settings (admin:repo scope)
+    try {
+      const { data: repoData } = await octokit.repos.get({
+        owner,
+        repo,
+      });
+      // Try a harmless read to verify we have access
+      console.log("✅ Repository access: OK");
+    } catch (error: any) {
+      if (error.status === 403) {
+        console.error("❌ Repository access denied");
+        throw error;
+      }
+    }
+
+    // Check admin:repo by trying to get branch protection (read-only check)
+    try {
+      await octokit.repos.getBranchProtection({
+        owner,
+        repo,
+        branch,
+      });
+      console.log("✅ Branch protection read access: OK (admin:repo scope present)");
+    } catch (error: any) {
+      if (error.status === 403) {
+        console.error("❌ Missing 'admin:repo' scope");
+        console.error("\n💡 To fix this:");
+        console.error("   1. Go to: https://github.com/settings/tokens");
+        console.error("   2. Create a new token (or edit existing)");
+        console.error("   3. Select these scopes:");
+        console.error("      - ✅ repo (full control)");
+        console.error("      - ✅ admin:repo (for branch protection)");
+        if (createTeams) {
+          console.error("      - ✅ admin:org (for team creation)");
+        }
+        console.error("   4. Generate token and use it as GITHUB_TOKEN");
+        throw new Error("Insufficient permissions: admin:repo scope required");
+      } else if (error.status === 404) {
+        // Branch protection doesn't exist yet, which is fine
+        console.log("ℹ️  Branch protection not set yet (will be created)");
+      }
+    }
+
+    if (createTeams) {
+      // Check admin:org by trying to list teams
+      try {
+        await octokit.teams.list({
+          org: owner,
+          per_page: 1,
+        });
+        console.log("✅ Organization access: OK (admin:org scope present)");
+      } catch (error: any) {
+        if (error.status === 403) {
+          console.error("❌ Missing 'admin:org' scope (required for --create-teams)");
+          console.error("\n💡 To fix this:");
+          console.error("   1. Go to: https://github.com/settings/tokens");
+          console.error("   2. Edit your token");
+          console.error("   3. Add 'admin:org' scope");
+          console.error("   4. Or run without --create-teams and create teams manually");
+          throw new Error("Insufficient permissions: admin:org scope required for team creation");
+        }
+      }
+    }
+
+    console.log("");
+  } catch (error: any) {
+    if (error.message.includes("Insufficient permissions")) {
+      process.exit(1);
+    }
+    // If it's a different error, let it bubble up
+    throw error;
+  }
 }
 
 const [owner, repo] = args.values.repo!.split("/");
@@ -322,18 +407,25 @@ async function main() {
   console.log(`   Branch: ${branch}\n`);
 
   try {
-    // 0. Create or verify teams (if requested)
+    // 0. Check token permissions first
+    if (!dryRun) {
+      await checkTokenPermissions();
+    } else {
+      console.log("🔍 Skipping permission check (dry-run mode)\n");
+    }
+
+    // 1. Create or verify teams (if requested)
     if (createTeams || dryRun) {
       await createOrVerifyTeams();
     }
 
-    // 1. Configure merge settings first (easier to change)
+    // 2. Configure merge settings first (easier to change)
     await configureMergeSettings();
 
-    // 2. Set default branch
+    // 3. Set default branch
     await setDefaultBranch();
 
-    // 3. Configure branch protection (most restrictive, do last)
+    // 4. Configure branch protection (most restrictive, do last)
     await setupBranchProtection();
 
     console.log("\n✅ All configuration complete!");
