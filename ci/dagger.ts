@@ -207,7 +207,7 @@ async function runTrunkPipeline(client: Client, source: Directory): Promise<void
     .container()
     .from("rust:1.75-slim")
     .withMountedDirectory("/src", source)
-    .withWorkdir("/src")
+    .withWorkdir("/src/services")
     .withExec(["cargo", "build", "--release"]);
 
   await rustRelease.stdout();
