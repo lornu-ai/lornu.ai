@@ -1,0 +1,30 @@
+# CODEOWNERS for lornu.ai
+# Enforces ownership without complex branch naming
+
+# Rust Engine
+/services/engine/ @engine-team
+/services/engine/** @engine-team
+
+# Web Application (Bun/Next.js)
+/apps/web/ @ui-team
+/apps/web/** @ui-team
+
+# Infrastructure (TypeScript/CDK8s)
+/infra/ @infra-ops
+/infra/** @infra-ops
+
+# CI/CD (Dagger/Bun)
+/ci/ @infra-ops
+/ci/** @infra-ops
+/.github/workflows/ @infra-ops
+
+# Agents (experimental)
+/agents/ @agent-team
+/agents/** @agent-team
+
+# Root config files
+/Justfile @infra-ops
+/dagger.json @infra-ops
+/pyproject.toml @engine-team
+/Cargo.toml @engine-team
+/package.json @ui-team
