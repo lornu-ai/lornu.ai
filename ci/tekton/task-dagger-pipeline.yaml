@@ -1,0 +1,82 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: dagger-pipeline
+  namespace: tekton-pipelines
+  labels:
+    lornu.ai/component: tekton
+    lornu.ai/managed-by: cdk8s
+    app.kubernetes.io/part-of: lornu-ai
+  annotations:
+    tekton.dev/displayName: Dagger Pipeline Task
+spec:
+  description: Runs the Dagger CI pipeline for lornu.ai based on branch pattern
+  params:
+    - name: branch
+      type: string
+      description: Git branch name
+    - name: event
+      type: string
+      description: Git event type (push, pull_request, merge)
+      default: push
+    - name: base-branch
+      type: string
+      description: Base branch for PR events
+      default: ""
+  workspaces:
+    - name: source
+      description: The git repo source code
+  steps:
+    - name: install-dependencies
+      image: oven/bun:latest
+      workingDir: $(workspaces.source.path)
+      script: |
+        #!/bin/bash
+        set -e
+        echo "📦 Installing dependencies..."
+        bun install
+        echo "✅ Dependencies installed"
+    - name: run-dagger-pipeline
+      image: ghcr.io/dagger/dagger:latest
+      workingDir: $(workspaces.source.path)
+      env:
+        - name: DAGGER_LOG_FORMAT
+          value: plain
+        - name: DAGGER_LOG_LEVEL
+          value: info
+      script: |
+        #!/bin/bash
+        set -e
+
+        BRANCH="$(params.branch)"
+        EVENT="$(params.event)"
+        BASE_BRANCH="$(params.base-branch)"
+
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "🔍 Branch: $BRANCH"
+        echo "🔍 Event: $EVENT"
+        echo "🔍 Base Branch: $BASE_BRANCH"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+        # Determine branch pattern
+        if [[ "$BRANCH" == feat/* ]]; then
+          PATTERN="feat"
+        elif [[ "$BRANCH" == infra/* ]]; then
+          PATTERN="infra"
+        elif [[ "$BRANCH" == agent/* ]]; then
+          PATTERN="agent"
+        elif [[ "$BRANCH" == "ta" ]]; then
+          PATTERN="trunk"
+        else
+          PATTERN="unknown"
+        fi
+
+        echo "🔍 Pattern: $PATTERN"
+
+        # Run Dagger pipeline
+        bun ci/dagger.ts \
+          --branch "$BRANCH" \
+          --event "$EVENT" \
+          --base-branch "$BASE_BRANCH"
+
+        echo "✅ Dagger pipeline completed!"
