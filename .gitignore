@@ -48,6 +48,17 @@ bin/dagger
 *.p12
 *.pfx
 
+# Block secret-related JSON files (but allow config JSONs)
+secrets.json
+**/secrets.json
+**/*secret*.json
+**/*key*.json
+**/*credential*.json
+**/*token*.json
+**/*password*.json
+# Allow example files
+!secrets.json.example
+
 # GCP Service Account Keys - NEVER commit these!
 # Use ADC (gcloud auth application-default login) instead
 *-credentials.json

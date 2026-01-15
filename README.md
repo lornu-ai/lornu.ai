@@ -1,5 +1,7 @@
 # lornu.ai
 
+> ⚠️ **PUBLIC REPOSITORY**: This repository is public. **Never commit secrets, API keys, credentials, or sensitive data to git.** Use GCP Secret Manager for all secrets. See [Cross-Project Secrets](./docs/CROSS_PROJECT_SECRETS.md) for details.
+
 The remake of lornu.ai with Rust Engine and modern architecture.
 
 ## Features
