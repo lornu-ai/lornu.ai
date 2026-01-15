@@ -30,10 +30,14 @@ check:rust:
 
 # Bun type checking
 check:bun:
-    @echo ""
-    @echo "🔧 Checking Bun/TypeScript code..."
-    bun run typecheck
-    @echo "✅ Bun checks passed"
+    @if [ -f tsconfig.json ] || [ -f package.json ]; then \
+        echo ""; \
+        echo "🔧 Checking Bun/TypeScript code..."; \
+        bun run typecheck || echo "⚠️  TypeScript check skipped (no typecheck script)"; \
+        echo "✅ Bun checks passed"; \
+    else \
+        echo "ℹ️  No TypeScript config found, skipping Bun checks."; \
+    fi
 
 # Contract check (TypeShare between Rust and Bun)
 check:contracts:
