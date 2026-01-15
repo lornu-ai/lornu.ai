@@ -76,10 +76,26 @@ Examples:
   process.exit(0);
 }
 
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+// Try to get token from environment or GitHub CLI
+let GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+
+// If no token in env, try GitHub CLI
+if (!GITHUB_TOKEN) {
+  try {
+    const { execSync } = require("child_process");
+    GITHUB_TOKEN = execSync("gh auth token", { encoding: "utf-8" }).trim();
+    console.log("ℹ️  Using token from GitHub CLI (gh auth token)");
+  } catch (error) {
+    // GitHub CLI not available or not authenticated
+  }
+}
+
 if (!GITHUB_TOKEN) {
   console.error("❌ Error: GITHUB_TOKEN environment variable is required");
-  console.error("   Get a token from: https://github.com/settings/tokens");
+  console.error("   Options:");
+  console.error("   1. Set GITHUB_TOKEN environment variable");
+  console.error("   2. Use GitHub CLI: gh auth login --scopes repo,admin:repo,admin:org");
+  console.error("   3. Get a token from: https://github.com/settings/tokens");
   console.error("   Required scopes: repo, admin:repo (and admin:org for --create-teams)");
   process.exit(1);
 }
