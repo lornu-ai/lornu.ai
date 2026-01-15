@@ -1,0 +1,59 @@
+# === macOS Specific ===
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+
+# === Rust (services/engine) ===
+/target/
+**/*.rs.bk
+Cargo.lock
+# Keep Cargo.lock at the root if it's a workspace,
+# but ignore local cargo credentials
+.cargo/config.toml
+.cargo/credentials.toml
+
+# === Bun & TypeScript (apps/web, ci, infra) ===
+node_modules/
+bun.lockb
+# While bun.lockb is often committed, in a "Pure logic"
+# monorepo, some prefer letting the CI generate it to ensure parity.
+# If you want 100% deterministic builds, comment the line above.
+
+# === Next.js ===
+/apps/web/.next/
+/apps/web/out/
+/apps/web/build/
+
+# === CDK8s & Infrastructure ===
+# We synthesize on the fly; never commit the generated YAML
+/infra/dist/
+/infra/imports/
+# Imports are regenerated via 'bun run import:crossplane'
+
+# === Dagger ===
+.dagger/
+bin/dagger
+# If you download the dagger binary locally via script
+
+# === Environment & Secrets ===
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# === IDEs ===
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# === Logs ===
+*.log
+npm-debug.log*
+yarn-debug.log*
+bun-debug.log*

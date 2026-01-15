@@ -1,0 +1,30 @@
+{
+  "name": "@lornu-ai/infra",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "synth": "bun run main.ts",
+    "synth:dev": "LORNU_ENV=dev bun run main.ts",
+    "synth:staging": "LORNU_ENV=staging bun run main.ts",
+    "synth:prod": "LORNU_ENV=prod bun run main.ts",
+    "apply": "bun run ci/apply_ssa.ts",
+    "apply:dry-run": "bun run ci/apply_ssa.ts --dry-run",
+    "apply:wait": "bun run ci/apply_ssa.ts --wait",
+    "import:crossplane": "bunx cdk8s-cli import",
+    "validate": "bun run ci/validate.ts",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@kubernetes/client-node": "^0.21.0",
+    "cdk8s": "^2.68.0",
+    "cdk8s-plus-27": "^2.9.0",
+    "constructs": "^10.3.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.3.0"
+  },
+  "trustedDependencies": [
+    "cdk8s-cli"
+  ]
+}
