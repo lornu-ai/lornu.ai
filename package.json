@@ -12,7 +12,7 @@
     "infra:agent:sandbox:create": "bun infra/agent-sandbox.ts --action create",
     "infra:agent:sandbox:delete": "bun infra/agent-sandbox.ts --action delete",
     "infra:agent:deploy": "bun infra/agent-deploy.ts",
-    "ci:generate-workflow": "bun ci/generate-workflow.ts"
+    "ci:generate-tekton": "bun ci/generate-tekton.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",
@@ -21,7 +21,8 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@dagger.io/dagger": "^0.9.0",
-    "@octokit/rest": "^22.0.1"
+    "@dagger.io/dagger": "^0.15.0",
+    "@octokit/rest": "^22.0.1",
+    "yaml": "^2.3.4"
   }
 }
