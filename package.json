@@ -1,0 +1,25 @@
+{
+  "name": "lornu.ai",
+  "version": "0.1.0",
+  "description": "The remake of lornu.ai with Rust Engine and modern architecture",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "build": "echo 'Build script - implement based on your app structure'",
+    "infra:plan": "bun infra/plan.ts",
+    "infra:apply": "bun infra/apply.ts",
+    "infra:agent:sandbox:create": "bun infra/agent-sandbox.ts --action create",
+    "infra:agent:sandbox:delete": "bun infra/agent-sandbox.ts --action delete",
+    "infra:agent:deploy": "bun infra/agent-deploy.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^20.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@dagger.io/dagger": "^0.9.0"
+  }
+}

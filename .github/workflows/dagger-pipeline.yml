@@ -1,0 +1,77 @@
+name: Dagger Pipeline
+
+on:
+  push:
+    branches:
+      - "feat/**"
+      - "infra/**"
+      - "agent/**"
+      - "ta"
+  pull_request:
+    branches:
+      - "ta"
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch name to simulate"
+        required: true
+        default: "feat/test"
+
+jobs:
+  dagger-pipeline:
+    name: "Dagger Pipeline: ${{ github.ref_name }}"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Dagger
+        uses: dagger/dagger-for-github@v7
+        with:
+          version: latest
+
+      - name: Determine branch pattern
+        id: branch-pattern
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          if [[ "$BRANCH" == feat/* ]]; then
+            echo "pattern=feat" >> $GITHUB_OUTPUT
+          elif [[ "$BRANCH" == infra/* ]]; then
+            echo "pattern=infra" >> $GITHUB_OUTPUT
+          elif [[ "$BRANCH" == agent/* ]]; then
+            echo "pattern=agent" >> $GITHUB_OUTPUT
+          elif [[ "$BRANCH" == "ta" ]]; then
+            echo "pattern=trunk" >> $GITHUB_OUTPUT
+          else
+            echo "pattern=unknown" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run Dagger Pipeline
+        env:
+          DAGGER_LOG_FORMAT: plain
+          DAGGER_LOG_LEVEL: info
+        run: |
+          EVENT_TYPE="push"
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            EVENT_TYPE="pull_request"
+          elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            EVENT_TYPE="push"
+          fi
+          
+          bun ci/dagger.ts \
+            --branch "${{ github.ref_name }}" \
+            --event "$EVENT_TYPE" \
+            --base-branch "${{ github.base_ref }}"
+
+      - name: Cleanup agent sandbox (on branch delete)
+        if: github.event_name == 'delete' && startsWith(github.ref, 'refs/heads/agent/')
+        run: |
+          echo "🗑️  Branch deleted, cleaning up agent sandbox..."
+          # This would trigger sandbox deletion via webhook or scheduled job
+          # For now, log the action
+          echo "Sandbox cleanup triggered for: ${{ github.ref }}"
