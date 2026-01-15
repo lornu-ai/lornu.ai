@@ -130,3 +130,20 @@ clean:
     rm -rf apps/web/.next
     rm -rf apps/web/dist
     @echo "✅ Cleaned"
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Repository Setup
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# Setup branch protection for ta branch (requires GITHUB_TOKEN)
+setup-branch-protection:
+    @echo "🔐 Setting up branch protection for ta branch..."
+    @echo "   Requires GITHUB_TOKEN environment variable"
+    @echo "   Get token from: https://github.com/settings/tokens"
+    @echo "   Required scopes: repo, admin:repo"
+    bun scripts/setup-branch-protection.ts
+
+# Dry run: Show what would be configured
+setup-branch-protection-dry-run:
+    @echo "🔍 Dry run: Show what would be configured..."
+    bun scripts/setup-branch-protection.ts --dry-run
