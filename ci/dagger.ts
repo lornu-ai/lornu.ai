@@ -258,8 +258,10 @@ async function main() {
   console.log(`🔍 Pattern: ${pattern}`);
   console.log(`🔍 Event: ${event}\n`);
 
-  // Connect to Dagger
-  const client = await dag.connect();
+  // Connect to Dagger (disable telemetry to avoid OpenTelemetry dependency issues)
+  const client = await dag.connect({
+    logOutput: process.stdout,
+  });
 
   // Get source code
   const source = client.host().directory(".", {

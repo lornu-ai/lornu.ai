@@ -45,6 +45,16 @@ bin/dagger
 !.env.example
 *.pem
 *.key
+# Block secret-related JSON files (but allow config JSONs)
+secrets.json
+**/secrets.json
+**/*secret*.json
+**/*key*.json
+**/*credential*.json
+**/*token*.json
+**/*password*.json
+# Allow example files
+!secrets.json.example
 
 # === IDEs ===
 .vscode/
