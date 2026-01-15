@@ -40,12 +40,14 @@ uuid = { version = "1.6", features = ["v4", "serde"] }
 # Async utilities
 futures = "0.3"
 
-# Google Cloud for Secret Manager (ADC-based auth)
-google-cloud-secretmanager = "0.5"
-google-cloud-auth = { version = "0.16", features = ["default-tls"] }
+# Google Cloud SDK for Secret Manager (ADC-based auth)
+gcloud-sdk = { version = "0.25", features = ["google-cloud-secretmanager-v1"] }
 
 # Cloudflare API
 cloudflare = "0.12"
+
+# GitHub API (for team management)
+octocrab = "0.41"
 
 # Base64 encoding for Secret Manager payloads
 base64 = "0.22"
@@ -61,6 +63,10 @@ git2 = "0.18"
 
 # Chrono for timestamps
 chrono = { version = "0.4", features = ["serde"] }
+
+# Pin transitive dependency to version compatible with Rust 1.85
+# (home 0.5.12 requires Rust 1.88)
+home = "=0.5.9"
 
 [[bin]]
 name = "engine"

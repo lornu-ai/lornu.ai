@@ -1,12 +1,13 @@
 #!/usr/bin/env bun
 /**
  * Cross-Project Google Secret Manager Sync Script
- * 
+ *
  * Syncs secrets from GitHub Secrets to GCP Secret Manager with support for:
  * - Cross-project secret access (secrets in one project, accessed by workloads in another)
  * - Project-specific secret storage
  * - Automatic IAM binding for cross-project access
- * 
+ * - Optional sync to Kubernetes secrets
+ *
  * Usage:
  *   bun ci/sync_secrets.ts --project-id lornu-legacy --secret-name OPENAI_KEY
  *   bun ci/sync_secrets.ts --project-id lornu-v2 --secret-name DATABASE_URL
@@ -23,6 +24,8 @@ interface SecretConfig {
   accessorServiceAccount?: string; // SA in accessor project that needs access
   value?: string; // If provided, use this; otherwise read from env
   envVar?: string; // Environment variable name (defaults to secret name)
+  k8sSecretName?: string; // Kubernetes secret name (for GSM-to-K8s sync)
+  k8sNamespace?: string; // Kubernetes namespace (default: lornu-ai)
 }
 
 interface SyncConfig {
@@ -124,7 +127,7 @@ Config file format (secrets.json):
 
 async function ensureSecretExists(projectId: string, secretName: string, dryRun: boolean): Promise<void> {
   console.log(`🔍 Checking if secret exists: projects/${projectId}/secrets/${secretName}`);
-  
+
   try {
     await $`gcloud secrets describe ${secretName} --project=${projectId}`.quiet();
     console.log(`✅ Secret already exists: ${secretName}`);
@@ -133,7 +136,7 @@ async function ensureSecretExists(projectId: string, secretName: string, dryRun:
       console.log(`[DRY RUN] Would create secret: projects/${projectId}/secrets/${secretName}`);
       return;
     }
-    
+
     console.log(`📝 Creating secret: projects/${projectId}/secrets/${secretName}`);
     await $`gcloud secrets create ${secretName} --project=${projectId} --replication-policy="automatic"`;
     console.log(`✅ Secret created: ${secretName}`);
@@ -150,7 +153,7 @@ async function addSecretVersion(
     console.log(`[DRY RUN] Would add version to: projects/${projectId}/secrets/${secretName}`);
     return;
   }
-  
+
   console.log(`📝 Adding version to secret: ${secretName}`);
   await $`echo -n ${secretValue} | gcloud secrets versions add ${secretName} --project=${projectId} --data-file=-`;
   console.log(`✅ Secret version added: ${secretName}`);
@@ -168,9 +171,9 @@ async function grantCrossProjectAccess(
     );
     return;
   }
-  
+
   console.log(`🔐 Granting cross-project access to ${accessorServiceAccount}...`);
-  
+
   try {
     await $`gcloud secrets add-iam-policy-binding ${secretName} \
       --project=${projectId} \
@@ -186,7 +189,7 @@ async function grantCrossProjectAccess(
         b.role === "roles/secretmanager.secretAccessor" &&
         b.members?.includes(`serviceAccount:${accessorServiceAccount}`)
     );
-    
+
     if (hasAccess) {
       console.log(`ℹ️  Access already granted to ${accessorServiceAccount}`);
     } else {
@@ -195,9 +198,45 @@ async function grantCrossProjectAccess(
   }
 }
 
+async function syncToKubernetes(
+  projectId: string,
+  gsmSecretName: string,
+  k8sSecretName: string,
+  k8sNamespace: string,
+  dryRun: boolean
+): Promise<void> {
+  if (dryRun) {
+    console.log(`[DRY RUN] Would sync to K8s: ${k8sSecretName} in namespace ${k8sNamespace}`);
+    return;
+  }
+
+  console.log(`🔄 Syncing to Kubernetes: ${k8sSecretName} in ${k8sNamespace}`);
+
+  // Fetch secret from GSM
+  const secretValue = await $`gcloud secrets versions access latest --secret=${gsmSecretName} --project=${projectId}`.text();
+
+  // Create or update K8s secret (using stdin to avoid exposing value in command line)
+  const secretYaml = `
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${k8sSecretName}
+  namespace: ${k8sNamespace}
+  labels:
+    lornu.ai/managed-by: sync-secrets
+    lornu.ai/source: gsm
+type: Opaque
+stringData:
+  value: "${secretValue.trim().replace(/"/g, '\\"')}"
+`;
+
+  await $`echo ${secretYaml} | kubectl apply -f -`.quiet();
+  console.log(`✅ K8s secret synced: ${k8sSecretName}`);
+}
+
 async function syncSecret(config: SecretConfig, dryRun: boolean): Promise<void> {
-  const { name, projectId, accessorProjectId, accessorServiceAccount, value, envVar } = config;
-  
+  const { name, projectId, accessorProjectId, accessorServiceAccount, value, envVar, k8sSecretName, k8sNamespace } = config;
+
   // Get secret value
   const secretValue = value || process.env[envVar || name];
   if (!secretValue) {
@@ -205,7 +244,7 @@ async function syncSecret(config: SecretConfig, dryRun: boolean): Promise<void> 
       `Secret value not found. Provide --value or set environment variable: ${envVar || name}`
     );
   }
-  
+
   console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
   console.log(`📦 Syncing secret: ${name}`);
   console.log(`   Project: ${projectId}`);
@@ -213,48 +252,53 @@ async function syncSecret(config: SecretConfig, dryRun: boolean): Promise<void> 
     console.log(`   Cross-project access: ${accessorProjectId}`);
   }
   console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-  
+
   // Ensure secret exists
   await ensureSecretExists(projectId, name, dryRun);
-  
+
   // Add secret version
   await addSecretVersion(projectId, name, secretValue, dryRun);
-  
+
   // Grant cross-project access if needed
   if (accessorProjectId && accessorServiceAccount) {
     await grantCrossProjectAccess(projectId, name, accessorServiceAccount, dryRun);
     console.log(`\n💡 To access this secret from ${accessorProjectId}, use:`);
     console.log(`   projects/${projectId}/secrets/${name}/versions/latest`);
   }
-  
+
+  // Sync to Kubernetes if configured
+  if (k8sSecretName) {
+    await syncToKubernetes(projectId, name, k8sSecretName, k8sNamespace || "lornu-ai", dryRun);
+  }
+
   console.log(`✅ Secret synced successfully: ${name}\n`);
 }
 
 async function main() {
   const { values } = args;
   const dryRun = values["dry-run"] || false;
-  
+
   if (dryRun) {
     console.log("🔍 DRY RUN MODE - No changes will be made\n");
   }
-  
+
   // Load config from file if provided
   if (values.config) {
     const configPath = values.config;
     const configFile = await Bun.file(configPath).json() as SyncConfig;
     const defaultProjectId = configFile.defaultProjectId;
-    
+
     for (const secretConfig of configFile.secrets) {
       // Apply default project ID if not specified
       if (!secretConfig.projectId && defaultProjectId) {
         secretConfig.projectId = defaultProjectId;
       }
-      
+
       // Default envVar to secret name if not specified
       if (!secretConfig.envVar) {
         secretConfig.envVar = secretConfig.name;
       }
-      
+
       await syncSecret(secretConfig, dryRun);
     }
   } else if (values["project-id"] && values["secret-name"]) {
@@ -266,14 +310,14 @@ async function main() {
       accessorServiceAccount: values["accessor-service-account"],
       envVar: values["env-var"],
     };
-    
+
     await syncSecret(config, dryRun);
   } else {
     console.error("❌ Error: Either --config or --project-id + --secret-name must be provided");
     console.error("   Run with --help for usage information");
     process.exit(1);
   }
-  
+
   console.log("✅ All secrets synced successfully!");
 }
 

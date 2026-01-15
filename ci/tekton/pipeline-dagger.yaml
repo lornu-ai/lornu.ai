@@ -1,0 +1,60 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: dagger-ci
+  namespace: tekton-pipelines
+  labels:
+    lornu.ai/component: tekton
+    lornu.ai/managed-by: cdk8s
+    app.kubernetes.io/part-of: lornu-ai
+  annotations:
+    tekton.dev/displayName: Dagger CI Pipeline
+spec:
+  description: CI Pipeline for lornu.ai using Dagger. Clones repo and runs branch-specific pipeline.
+  params:
+    - name: repo-url
+      type: string
+      description: Git repository URL
+      default: https://github.com/lornu-ai/lornu.ai.git
+    - name: revision
+      type: string
+      description: Git revision (branch, tag, or SHA)
+      default: ta
+    - name: event
+      type: string
+      description: Git event type
+      default: push
+    - name: base-branch
+      type: string
+      description: Base branch for PR events
+      default: ""
+  workspaces:
+    - name: shared-workspace
+      description: Workspace shared across tasks
+  tasks:
+    - name: clone-repo
+      taskRef:
+        name: git-clone
+      params:
+        - name: url
+          value: $(params.repo-url)
+        - name: revision
+          value: $(params.revision)
+        - name: depth
+          value: "1"
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+    - name: run-dagger
+      taskRef:
+        name: dagger-pipeline
+      params:
+        - name: branch
+          value: $(params.revision)
+        - name: event
+          value: $(params.event)
+        - name: base-branch
+          value: $(params.base-branch)
+      workspaces:
+        - name: source
+          workspace: shared-workspace
