@@ -37,9 +37,22 @@ function parseArgs(): Args {
     } else if (arg === "--token" && i + 1 < process.argv.length) {
       args.token = process.argv[++i];
     } else if (arg === "--pr-number" && i + 1 < process.argv.length) {
-      args.prNumbers = [parseInt(process.argv[++i], 10)];
+      const prNum = parseInt(process.argv[++i], 10);
+      if (isNaN(prNum) || prNum <= 0) {
+        console.error(`❌ Invalid PR number: ${process.argv[i]}`);
+        process.exit(1);
+      }
+      args.prNumbers = [prNum];
     } else if (arg === "--pr-numbers" && i + 1 < process.argv.length) {
-      args.prNumbers = process.argv[++i].split(",").map(n => parseInt(n.trim(), 10));
+      const prNums = process.argv[++i].split(",").map(n => {
+        const num = parseInt(n.trim(), 10);
+        if (isNaN(num) || num <= 0) {
+          console.error(`❌ Invalid PR number: ${n.trim()}`);
+          process.exit(1);
+        }
+        return num;
+      });
+      args.prNumbers = prNums;
     } else if (arg === "--message" && i + 1 < process.argv.length) {
       args.message = process.argv[++i];
     }
@@ -48,6 +61,18 @@ function parseArgs(): Args {
   // Support environment variables
   args.repo = args.repo || process.env.GITHUB_REPOSITORY || "";
   args.token = args.token || process.env.GITHUB_TOKEN || "";
+  
+  // Validate repo format
+  if (args.repo && !args.repo.includes("/")) {
+    console.error(`❌ Invalid repo format: ${args.repo}. Expected: owner/repo`);
+    process.exit(1);
+  }
+  
+  // Validate token format (basic check)
+  if (args.token && args.token.length < 10) {
+    console.error("❌ Invalid token format: token appears too short");
+    process.exit(1);
+  }
   
   if (!args.repo || !args.token || !args.prNumbers || args.prNumbers.length === 0) {
     console.error("Usage: approve-prs-with-bot.ts --repo <OWNER/REPO> --token <TOKEN> --pr-number <NUMBER>");
@@ -71,22 +96,73 @@ async function approvePR(
     const finalOwner = owner || ownerName;
     const finalRepo = repoName || repo;
     
-    await octokit.pulls.createReview({
-      owner: finalOwner,
-      repo: finalRepo,
-      pull_number: prNumber,
-      event: "APPROVE",
-      body: message || "Approved by GitHub bot tool",
-    });
+    // Validate inputs
+    if (!finalOwner || !finalRepo) {
+      console.error(`❌ Invalid repo format: ${repo}. Expected: owner/repo`);
+      return false;
+    }
     
-    console.log(`✅ Approved PR #${prNumber} in ${finalOwner}/${finalRepo}`);
-    return true;
-  } catch (error: any) {
-    if (error.status === 422 && error.message?.includes("Can not approve your own pull request")) {
+    if (!prNumber || prNumber <= 0) {
+      console.error(`❌ Invalid PR number: ${prNumber}`);
+      return false;
+    }
+    
+    // Network request with timeout and retry logic
+    const maxRetries = 3;
+    let lastError: any = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await octokit.pulls.createReview({
+          owner: finalOwner,
+          repo: finalRepo,
+          pull_number: prNumber,
+          event: "APPROVE",
+          body: message || "Approved by GitHub bot tool",
+        });
+        
+        console.log(`✅ Approved PR #${prNumber} in ${finalOwner}/${finalRepo}`);
+        return true;
+      } catch (error: any) {
+        lastError = error;
+        
+        // Don't retry on client errors (4xx)
+        if (error.status >= 400 && error.status < 500) {
+          break;
+        }
+        
+        // Retry on network/server errors (5xx, timeouts)
+        if (attempt < maxRetries && (error.status >= 500 || error.code === "ETIMEDOUT" || error.code === "ECONNRESET")) {
+          const delay = attempt * 1000; // Exponential backoff
+          console.warn(`⚠️  Attempt ${attempt}/${maxRetries} failed, retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        
+        throw error;
+      }
+    }
+    
+    // Handle specific error cases
+    if (lastError?.status === 422 && lastError?.message?.includes("Can not approve your own pull request")) {
       console.error(`❌ PR #${prNumber}: Cannot approve your own PR (self-approval restriction)`);
       return false;
     }
-    console.error(`❌ Error approving PR #${prNumber}:`, error.message || error);
+    
+    if (lastError?.status === 404) {
+      console.error(`❌ PR #${prNumber}: Not found. Check repo and PR number.`);
+      return false;
+    }
+    
+    if (lastError?.status === 403) {
+      console.error(`❌ PR #${prNumber}: Forbidden. Check token permissions.`);
+      return false;
+    }
+    
+    console.error(`❌ Error approving PR #${prNumber}:`, lastError?.message || lastError);
+    return false;
+  } catch (error: any) {
+    console.error(`❌ Unexpected error approving PR #${prNumber}:`, error.message || error);
     return false;
   }
 }
