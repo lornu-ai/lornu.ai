@@ -113,6 +113,9 @@ test-infra:
 # Lint & Format
 # ============================================
 
+# Run all checks (for CI)
+check: scan-secrets lint fmt-check
+
 # Lint Rust services
 lint:
     cd services && cargo clippy -- -D warnings
@@ -120,6 +123,10 @@ lint:
 # Format Rust services
 fmt:
     cd services && cargo fmt
+
+# Check formatting without modifying
+fmt-check:
+    cd services && cargo fmt -- --check
 
 # ============================================
 # Infrastructure
