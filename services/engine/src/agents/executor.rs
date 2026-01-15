@@ -130,7 +130,6 @@ impl CrossplaneExecutor {
         };
         let api: Api<DynamicObject> = Api::namespaced_with(self.client.clone(), NAMESPACE, &ar);
 
-        // Check if already exists
         if api.get_opt(name).await?.is_some() {
             info!("Claim {} already exists, skipping creation", name);
             return Ok(());
@@ -187,45 +186,24 @@ impl CrossplaneExecutor {
     pub async fn list_agent_resources(&self) -> Result<Vec<serde_json::Value>> {
         let mut resources = Vec::new();
 
-        // List AgentMemory claims
-        let memory_ar = ApiResource {
-            group: "lornu.ai".to_string(),
-            version: "v1alpha1".to_string(),
-            api_version: "lornu.ai/v1alpha1".to_string(),
-            kind: "AgentMemory".to_string(),
-            plural: "agentmemories".to_string(),
-        };
-        let memory_api: Api<DynamicObject> =
-            Api::namespaced_with(self.client.clone(), NAMESPACE, &memory_ar);
+        for (kind, plural) in [("AgentMemory", "agentmemories"), ("AgentWorker", "agentworkers")] {
+            let ar = ApiResource {
+                group: "lornu.ai".to_string(),
+                version: "v1alpha1".to_string(),
+                api_version: "lornu.ai/v1alpha1".to_string(),
+                kind: kind.to_string(),
+                plural: plural.to_string(),
+            };
+            let api: Api<DynamicObject> = Api::namespaced_with(self.client.clone(), NAMESPACE, &ar);
 
-        if let Ok(list) = memory_api.list(&ListParams::default()).await {
-            for item in list {
-                resources.push(json!({
-                    "kind": "AgentMemory",
-                    "name": item.name_any(),
-                    "status": item.data.get("status")
-                }));
-            }
-        }
-
-        // List AgentWorker claims
-        let worker_ar = ApiResource {
-            group: "lornu.ai".to_string(),
-            version: "v1alpha1".to_string(),
-            api_version: "lornu.ai/v1alpha1".to_string(),
-            kind: "AgentWorker".to_string(),
-            plural: "agentworkers".to_string(),
-        };
-        let worker_api: Api<DynamicObject> =
-            Api::namespaced_with(self.client.clone(), NAMESPACE, &worker_ar);
-
-        if let Ok(list) = worker_api.list(&ListParams::default()).await {
-            for item in list {
-                resources.push(json!({
-                    "kind": "AgentWorker",
-                    "name": item.name_any(),
-                    "status": item.data.get("status")
-                }));
+            if let Ok(list) = api.list(&ListParams::default()).await {
+                for item in list {
+                    resources.push(json!({
+                        "kind": kind,
+                        "name": item.name_any(),
+                        "status": item.data.get("status")
+                    }));
+                }
             }
         }
 

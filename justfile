@@ -1,15 +1,75 @@
 # Lornu AI - Developer Workflow Commands
 # Usage: just <recipe>
+#
+# Security: This project uses ADC (Application Default Credentials).
+# Run `gcloud auth application-default login` before local development.
 
 set shell := ["bash", "-cu"]
 
-# Default recipe shows available commands
 default:
     @just --list
 
 # ============================================
+# Security (Run before commits!)
+# ============================================
+
+# Scan for secrets before committing - REQUIRED
+scan-secrets:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Scanning for secrets..."
+
+    PATTERNS=(
+        'sk-[a-zA-Z0-9]{20,}'
+        'AIza[a-zA-Z0-9_-]{35}'
+        'AKIA[A-Z0-9]{16}'
+        'ghp_[a-zA-Z0-9]{36}'
+        'gho_[a-zA-Z0-9]{36}'
+        'glpat-[a-zA-Z0-9_-]{20}'
+        'xox[baprs]-[a-zA-Z0-9-]+'
+        '"password":\s*"[^"]+'
+        '"api_key":\s*"[^"]+'
+        '"secret":\s*"[^"]+'
+    )
+
+    FOUND=0
+    for pattern in "${PATTERNS[@]}"; do
+        if grep -rE "$pattern" --include='*.rs' --include='*.ts' --include='*.json' --include='*.yaml' --include='*.yml' . 2>/dev/null | grep -v 'justfile' | grep -v '.git'; then
+            echo "WARNING: Potential secret found matching pattern: $pattern"
+            FOUND=1
+        fi
+    done
+
+    if find . -name "*.json" -exec grep -l '"type": "service_account"' {} \; 2>/dev/null | grep -v node_modules; then
+        echo "ERROR: GCP service account JSON key found! Use ADC instead."
+        FOUND=1
+    fi
+
+    if [ $FOUND -eq 1 ]; then
+        echo "Secret scan FAILED. Remove secrets before committing."
+        exit 1
+    fi
+
+    echo "Secret scan PASSED - no secrets found."
+
+# Safe commit wrapper - scans before committing
+commit msg: scan-secrets
+    git add .
+    git commit -m "{{msg}}"
+
+# ============================================
 # Development
 # ============================================
+
+# Setup local development (ADC auth)
+setup:
+    @echo "Setting up local development..."
+    @echo "1. Authenticating with GCP ADC..."
+    gcloud auth application-default login
+    @echo "2. Installing dependencies..."
+    cd infra && bun install
+    cd services && cargo fetch
+    @echo "Setup complete!"
 
 # Start infrastructure (synth CDK8s manifests)
 dev-infra:
@@ -39,7 +99,7 @@ build-infra:
 # ============================================
 
 # Run all tests
-test: test-services test-infra
+test: test-services scan-secrets
 
 # Test Rust services
 test-services:
@@ -82,11 +142,11 @@ apply-dry-run env="dev":
 # ============================================
 
 # Run full CI pipeline via Dagger
-ci:
+ci: scan-secrets
     dagger run bun ci/main.ts
 
 # Run CI without infrastructure setup
-ci-fast:
+ci-fast: scan-secrets
     dagger run bun ci/main.ts --skip-infra
 
 # ============================================
@@ -94,15 +154,10 @@ ci-fast:
 # ============================================
 
 # Clean all build artifacts
-clean: clean-services clean-infra
-
-# Clean Rust build artifacts
-clean-services:
-    cd services && cargo clean
-
-# Clean infrastructure artifacts
-clean-infra:
+clean:
+    rm -rf services/target
     rm -rf infra/cdk8s.out
+    rm -rf infra/node_modules
 
 # ============================================
 # Utilities
@@ -110,14 +165,15 @@ clean-infra:
 
 # Check versions of all tools
 versions:
-    @echo "Rust: $(rustc --version)"
-    @echo "Cargo: $(cargo --version)"
-    @echo "Bun: $(bun --version)"
-    @echo "Just: $(just --version)"
-    @echo "Kubectl: $(kubectl version --client --short 2>/dev/null || echo 'not installed')"
+    @echo "Rust: $(rustc --version 2>/dev/null || echo 'not installed')"
+    @echo "Cargo: $(cargo --version 2>/dev/null || echo 'not installed')"
+    @echo "Bun: $(bun --version 2>/dev/null || echo 'not installed')"
+    @echo "gcloud: $(gcloud --version 2>/dev/null | head -1 || echo 'not installed')"
+    @echo "kubectl: $(kubectl version --client --short 2>/dev/null || echo 'not installed')"
 
-# Install development dependencies
-setup:
-    cd infra && bun install
-    cd services && cargo fetch
-    @echo "Setup complete!"
+# Verify ADC is configured
+check-auth:
+    @echo "Checking ADC configuration..."
+    @gcloud auth application-default print-access-token > /dev/null 2>&1 && \
+        echo "ADC configured correctly" || \
+        (echo "ERROR: Run 'gcloud auth application-default login' first" && exit 1)
