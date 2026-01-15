@@ -1,5 +1,9 @@
 # GitHub Token Setup for Branch Protection Script
 
+## ⚠️ Important: Must Use Classic Token
+
+**You MUST use a Personal Access Token (classic)**, not a fine-grained token. Fine-grained tokens don't support `admin:repo` scope.
+
 ## Required Permissions
 
 The `setup-branch-protection.ts` script requires specific GitHub token scopes:
@@ -13,21 +17,24 @@ The `setup-branch-protection.ts` script requires specific GitHub token scopes:
   - Required to configure branch protection rules
   - Required to change default branch
   - Required to configure merge settings
+  - ⚠️ **Only available in classic tokens**
 
 ### For Team Creation (optional)
 - **`admin:org`** - Full control of organization settings
   - Only needed if using `--create-teams` flag
   - Required to create teams in the organization
+  - ⚠️ **Only available in classic tokens**
 
 ## How to Create/Update Token
 
 1. **Go to GitHub Token Settings**
    - Visit: https://github.com/settings/tokens
-   - Or: GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
+   - Or: GitHub → Settings → Developer settings → Personal access tokens → **Tokens (classic)**
 
-2. **Create New Token or Edit Existing**
-   - Click "Generate new token" → "Generate new token (classic)"
-   - Or edit an existing token
+2. **Create New Classic Token**
+   - Click "**Generate new token**" → "**Generate new token (classic)**"
+   - ⚠️ **Important**: Select "classic", NOT "fine-grained"
+   - Or edit an existing classic token
 
 3. **Select Required Scopes**
    - ✅ **repo** (Full control of private repositories)
@@ -51,7 +58,7 @@ The `setup-branch-protection.ts` script requires specific GitHub token scopes:
 - ✅ Use environment variables
 - ✅ Use GitHub Secrets in CI/CD
 - ✅ Rotate tokens regularly
-- ✅ Use fine-grained tokens when possible (GitHub's newer token type)
+- ⚠️ **Note**: This script requires classic tokens (fine-grained tokens don't support admin scopes)
 
 ## Troubleshooting
 

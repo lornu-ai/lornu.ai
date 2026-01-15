@@ -60,8 +60,10 @@ Options:
   --help, -h             Show this help message
 
 Environment Variables:
-  GITHUB_TOKEN           GitHub Personal Access Token (required)
+  GITHUB_TOKEN           GitHub Personal Access Token (classic) - REQUIRED
+                         ⚠️  Must be "classic" token (not fine-grained)
                          Needs: repo, admin:repo (for branch protection)
+                         Get from: https://github.com/settings/tokens (classic)
 
 Examples:
   # Dry run to see what would be configured
@@ -94,9 +96,10 @@ if (!GITHUB_TOKEN) {
   console.error("❌ Error: GITHUB_TOKEN environment variable is required");
   console.error("   Options:");
   console.error("   1. Set GITHUB_TOKEN environment variable");
-  console.error("   2. Use GitHub CLI: gh auth login --scopes repo,admin:repo,admin:org");
-  console.error("   3. Get a token from: https://github.com/settings/tokens");
-  console.error("   Required scopes: repo, admin:repo (and admin:org for --create-teams)");
+  console.error("   2. Get a Personal Access Token (classic) from: https://github.com/settings/tokens");
+  console.error("      ⚠️  Must be 'classic' token (not fine-grained)");
+  console.error("      Required scopes: repo, admin:repo (and admin:org for --create-teams)");
+  console.error("   3. Note: GitHub CLI OAuth tokens don't support admin:repo scope");
   process.exit(1);
 }
 
@@ -139,7 +142,8 @@ async function checkTokenPermissions() {
         console.error("❌ Missing 'admin:repo' scope");
         console.error("\n💡 To fix this:");
         console.error("   1. Go to: https://github.com/settings/tokens");
-        console.error("   2. Create a new token (or edit existing)");
+        console.error("   2. Click 'Generate new token' → 'Generate new token (classic)'");
+        console.error("      ⚠️  Must be 'classic' token (not fine-grained)");
         console.error("   3. Select these scopes:");
         console.error("      - ✅ repo (full control)");
         console.error("      - ✅ admin:repo (for branch protection)");
