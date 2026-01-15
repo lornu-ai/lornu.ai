@@ -91,7 +91,7 @@ impl GitHubTeamTool {
         };
 
         // Use the Teams API to add/update membership
-        let response = self
+        let response: Result<serde_json::Value, _> = self
             .client
             .put(
                 format!(
@@ -138,7 +138,7 @@ impl GitHubTeamTool {
             "Removing member from team"
         );
 
-        let response = self
+        let response: Result<serde_json::Value, _> = self
             .client
             .delete(
                 format!(
@@ -183,7 +183,7 @@ impl GitHubTeamTool {
         let team_slugs: Vec<String> = teams
             .items
             .iter()
-            .filter_map(|t| t.slug.clone())
+            .map(|t| t.slug.clone())
             .collect();
 
         Ok(team_slugs)
