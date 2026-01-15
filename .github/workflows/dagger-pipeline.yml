@@ -19,22 +19,19 @@ on:
 
 jobs:
   dagger-pipeline:
-    name: "Dagger Pipeline: ${{ github.ref_name }}"
+    name: Dagger Pipeline: ${{ github.ref_name }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-
       - name: Install Dagger
         uses: dagger/dagger-for-github@v7
         with:
           version: latest
-
       - name: Determine branch pattern
         id: branch-pattern
         run: |
@@ -50,7 +47,6 @@ jobs:
           else
             echo "pattern=unknown" >> $GITHUB_OUTPUT
           fi
-
       - name: Run Dagger Pipeline
         env:
           DAGGER_LOG_FORMAT: plain
@@ -67,7 +63,6 @@ jobs:
             --branch "${{ github.ref_name }}" \
             --event "$EVENT_TYPE" \
             --base-branch "${{ github.base_ref }}"
-
       - name: Cleanup agent sandbox (on branch delete)
         if: github.event_name == 'delete' && startsWith(github.ref, 'refs/heads/agent/')
         run: |
