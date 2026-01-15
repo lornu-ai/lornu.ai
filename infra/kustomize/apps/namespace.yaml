@@ -1,8 +1,0 @@
-# Lornu AI Application Namespace
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: lornu-ai
-  labels:
-    lornu.ai/managed-by: kustomize
-    lornu.ai/environment: production
