@@ -10,11 +10,12 @@
 //! - Self-corrects by looking up similar past conflicts
 
 use anyhow::{Context, Result};
+use async_openai::config::OpenAIConfig;
 use chrono::{DateTime, Utc};
 use git2::{CherrypickOptions, Index, Repository, Signature};
 use qdrant_client::qdrant::{
     CreateCollectionBuilder, Distance, PointStruct, SearchPointsBuilder, UpsertPointsBuilder,
-    VectorParamsBuilder,
+    Value, VectorParamsBuilder,
 };
 use qdrant_client::Qdrant;
 use serde::{Deserialize, Serialize};
@@ -568,21 +569,21 @@ impl CherryPickAgent {
         // Generate embedding
         let embedding = self.generate_embedding(conflict_signature).await?;
 
-        // Create payload
-        let mut payload: HashMap<String, qdrant_client::qdrant::Value> = HashMap::new();
-        payload.insert("id".to_string(), id.to_string().into());
+        // Create payload with explicit Value type for Qdrant
+        let mut payload: HashMap<String, Value> = HashMap::new();
+        payload.insert("id".to_string(), Value::from(id.to_string()));
         payload.insert(
             "conflict_signature".to_string(),
-            conflict_signature.to_string().into(),
+            Value::from(conflict_signature.to_string()),
         );
-        payload.insert("file_path".to_string(), file_path.to_string().into());
-        payload.insert("resolution".to_string(), resolution.to_string().into());
-        payload.insert("success_count".to_string(), 1i64.into());
-        payload.insert("failure_count".to_string(), 0i64.into());
-        payload.insert("source_commit".to_string(), source_commit.to_string().into());
-        payload.insert("target_branch".to_string(), target_branch.to_string().into());
-        payload.insert("created_at".to_string(), now.to_rfc3339().into());
-        payload.insert("last_used_at".to_string(), now.to_rfc3339().into());
+        payload.insert("file_path".to_string(), Value::from(file_path.to_string()));
+        payload.insert("resolution".to_string(), Value::from(resolution.to_string()));
+        payload.insert("success_count".to_string(), Value::from(1i64));
+        payload.insert("failure_count".to_string(), Value::from(0i64));
+        payload.insert("source_commit".to_string(), Value::from(source_commit.to_string()));
+        payload.insert("target_branch".to_string(), Value::from(target_branch.to_string()));
+        payload.insert("created_at".to_string(), Value::from(now.to_rfc3339()));
+        payload.insert("last_used_at".to_string(), Value::from(now.to_rfc3339()));
 
         // Upsert to Qdrant
         self.qdrant
