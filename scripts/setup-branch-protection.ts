@@ -99,8 +99,9 @@ if (!GITHUB_TOKEN) {
   console.error("   1. Set GITHUB_TOKEN environment variable");
   console.error("   2. Get a Personal Access Token (classic) from: https://github.com/settings/tokens");
   console.error("      ⚠️  Must be 'classic' token (not fine-grained)");
-  console.error("      Required scopes: repo, admin:repo (and admin:org for --create-teams)");
-  console.error("   3. Note: GitHub CLI OAuth tokens don't support admin:repo scope");
+      console.error("      Required scopes: repo (Full control) - and admin:org for --create-teams");
+      console.error("      Note: 'repo' scope includes admin:repo permissions");
+      console.error("   3. Note: GitHub CLI OAuth tokens may not have sufficient permissions");
   process.exit(1);
 }
 
