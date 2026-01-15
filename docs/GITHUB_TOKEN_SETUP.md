@@ -13,11 +13,12 @@ The `setup-branch-protection.ts` script requires specific GitHub token scopes:
   - Read and write access to code, pull requests, issues, etc.
 
 ### For Branch Protection
-- **`admin:repo`** - Full control of repository settings
+- **`repo`** - Full control of private repositories
+  - Includes admin:repo permissions for repository settings
   - Required to configure branch protection rules
   - Required to change default branch
   - Required to configure merge settings
-  - ⚠️ **Only available in classic tokens**
+  - ⚠️ **Note**: For organization repositories, you may also need organization admin role
 
 ### For Team Creation (optional)
 - **`admin:org`** - Full control of organization settings
@@ -38,8 +39,10 @@ The `setup-branch-protection.ts` script requires specific GitHub token scopes:
 
 3. **Select Required Scopes**
    - ✅ **repo** (Full control of private repositories)
-   - ✅ **admin:repo** (Full control of repository settings)
-   - ✅ **admin:org** (Full control of organization settings) - Only if using `--create-teams`
+     - This includes admin:repo permissions for repository settings
+   - ✅ **admin:org** (Full control of orgs and teams) - Only if using `--create-teams`
+   
+   **Note**: `admin:repo` is not a separate scope - it's included in `repo` scope with full control
 
 4. **Generate Token**
    - Click "Generate token"

@@ -62,7 +62,8 @@ Options:
 Environment Variables:
   GITHUB_TOKEN           GitHub Personal Access Token (classic) - REQUIRED
                          ⚠️  Must be "classic" token (not fine-grained)
-                         Needs: repo, admin:repo (for branch protection)
+                         Needs: repo (Full control of private repositories)
+                         For org repos: may need org admin role
                          Get from: https://github.com/settings/tokens (classic)
 
 Examples:
@@ -288,11 +289,13 @@ async function setupBranchProtection() {
       console.error(`❌ Error: Repository ${owner}/${repo} not found or no access`);
       console.error("   Check your GITHUB_TOKEN has the correct permissions");
       process.exit(1);
-    } else if (error.status === 403) {
-      console.error(`❌ Error: Insufficient permissions`);
-      console.error("   GITHUB_TOKEN needs 'admin:repo' scope for branch protection");
-      process.exit(1);
-    }
+      } else if (error.status === 403) {
+        console.error(`❌ Error: Insufficient permissions`);
+        console.error("   GITHUB_TOKEN needs 'repo' scope with full control");
+        console.error("   For organization repos, you may also need organization admin role");
+        console.error("   Check: https://github.com/orgs/{org}/people");
+        process.exit(1);
+      }
     throw error;
   }
 }
