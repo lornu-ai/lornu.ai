@@ -19,6 +19,9 @@ axum = { version = "0.7", features = ["tokio", "json"] }
 tower = "0.5"
 tower-http = { version = "0.5", features = ["cors", "trace"] }
 
+# HTTP client for external APIs
+reqwest = { version = "0.12", features = ["json"] }
+
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -36,6 +39,16 @@ uuid = { version = "1.6", features = ["v4", "serde"] }
 
 # Async utilities
 futures = "0.3"
+
+# Google Cloud for Secret Manager (ADC-based auth)
+google-cloud-secretmanager = "0.5"
+google-cloud-auth = { version = "0.16", features = ["default-tls"] }
+
+# Cloudflare API
+cloudflare = "0.12"
+
+# Base64 encoding for Secret Manager payloads
+base64 = "0.22"
 
 [[bin]]
 name = "engine"
