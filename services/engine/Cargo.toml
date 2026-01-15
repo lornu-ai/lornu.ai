@@ -52,14 +52,14 @@ octocrab = "0.41"
 # Base64 encoding for Secret Manager payloads
 base64 = "0.22"
 
-# Git operations for CherryPickAgent
-git2 = "0.19"
+# OpenAI client for embeddings
+async-openai = "0.24"
 
-# Vector DB for agent learning/memory
+# Qdrant vector database client
 qdrant-client = "1.12"
 
-# Embeddings for similarity search
-async-openai = "0.24"
+# Git operations
+git2 = "0.19"
 
 # Chrono for timestamps
 chrono = { version = "0.4", features = ["serde"] }

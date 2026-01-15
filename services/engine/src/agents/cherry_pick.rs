@@ -32,6 +32,8 @@ const EMBEDDING_DIM: u64 = 1536;
 /// Minimum similarity score to consider a resolution match
 const MIN_SIMILARITY_SCORE: f32 = 0.85;
 
+/// Minimum success rate threshold to automatically apply a resolution
+const MIN_SUCCESS_RATE_THRESHOLD: f32 = 0.7;
 /// A stored conflict resolution pattern
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResolutionPattern {
@@ -96,8 +98,8 @@ pub struct CherryPickAgent {
     repo: Repository,
     /// Qdrant client for vector storage
     qdrant: Qdrant,
-    /// OpenAI client for embeddings
-    openai_api_key: String,
+    /// OpenAI client for embeddings (reused across calls)
+    openai_client: async_openai::Client<async_openai::config::OpenAIConfig>,
 }
 
 impl CherryPickAgent {
@@ -112,6 +114,7 @@ impl CherryPickAgent {
         qdrant_url: &str,
         openai_api_key: String,
     ) -> Result<Self> {
+        use async_openai::{config::OpenAIConfig, Client};
         let repo = Repository::open(repo_path)
             .with_context(|| format!("Failed to open repository at {:?}", repo_path))?;
 
@@ -119,10 +122,14 @@ impl CherryPickAgent {
             .build()
             .with_context(|| format!("Failed to connect to Qdrant at {}", qdrant_url))?;
 
+        // Create OpenAI client once for reuse
+        let config = OpenAIConfig::new().with_api_key(&openai_api_key);
+        let openai_client = Client::with_config(config);
+
         let agent = Self {
             repo,
             qdrant,
-            openai_api_key,
+            openai_client,
         };
 
         // Ensure collection exists
@@ -224,7 +231,7 @@ impl CherryPickAgent {
             .context("Failed to checkout tree")?;
 
         self.repo
-            .set_head(reference.name().unwrap())
+            .set_head(reference.name().context("Reference name is not valid UTF-8")?)
             .context("Failed to set HEAD")?;
 
         info!(branch = %branch_name, "Checked out branch");
@@ -270,7 +277,7 @@ impl CherryPickAgent {
                 );
 
                 // Apply the resolution if success rate is high enough
-                if pattern.success_rate() >= 0.7 {
+                if pattern.success_rate() >= MIN_SUCCESS_RATE_THRESHOLD {
                     match self.apply_resolution(&file_path, &pattern.resolution).await {
                         Ok(_) => {
                             resolutions_applied += 1;
@@ -370,50 +377,81 @@ impl CherryPickAgent {
         if let Some(point) = results.result.first() {
             let payload = &point.payload;
 
-            // Deserialize the pattern from payload
+            // Deserialize the pattern from payload with proper error handling
+            let id_str = payload
+                .get("id")
+                .and_then(|v| v.as_str())
+                .context("id field missing or invalid from payload")?;
+            let id = Uuid::parse_str(id_str)
+                .with_context(|| format!("id field '{}' is not a valid UUID", id_str))?;
+
+            let conflict_signature = payload
+                .get("conflict_signature")
+                .and_then(|v| v.as_str())
+                .context("conflict_signature field missing or invalid from payload")?
+                .to_string();
+
+            let file_path = payload
+                .get("file_path")
+                .and_then(|v| v.as_str())
+                .context("file_path field missing or invalid from payload")?
+                .to_string();
+
+            let resolution = payload
+                .get("resolution")
+                .and_then(|v| v.as_str())
+                .context("resolution field missing or invalid from payload")?
+                .to_string();
+
+            let success_count = payload
+                .get("success_count")
+                .and_then(|v| v.as_integer())
+                .context("success_count field missing or invalid from payload")? as u32;
+
+            let failure_count = payload
+                .get("failure_count")
+                .and_then(|v| v.as_integer())
+                .context("failure_count field missing or invalid from payload")? as u32;
+
+            let created_at_str = payload
+                .get("created_at")
+                .and_then(|v| v.as_str())
+                .context("created_at field missing or invalid from payload")?;
+            let created_at = DateTime::parse_from_rfc3339(created_at_str)
+                .with_context(|| format!("created_at '{}' is not valid RFC3339", created_at_str))?
+                .with_timezone(&Utc);
+
+            let last_used_at_str = payload
+                .get("last_used_at")
+                .and_then(|v| v.as_str())
+                .context("last_used_at field missing or invalid from payload")?;
+            let last_used_at = DateTime::parse_from_rfc3339(last_used_at_str)
+                .with_context(|| format!("last_used_at '{}' is not valid RFC3339", last_used_at_str))?
+                .with_timezone(&Utc);
+
+            let source_commit = payload
+                .get("source_commit")
+                .and_then(|v| v.as_str())
+                .context("source_commit field missing or invalid from payload")?
+                .to_string();
+
+            let target_branch = payload
+                .get("target_branch")
+                .and_then(|v| v.as_str())
+                .context("target_branch field missing or invalid from payload")?
+                .to_string();
+
             let pattern = ResolutionPattern {
-                id: Uuid::parse_str(
-                    payload
-                        .get("id")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or_default(),
-                )
-                .unwrap_or_else(|_| Uuid::new_v4()),
-                conflict_signature: payload
-                    .get("conflict_signature")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or_default()
-                    .to_string(),
-                file_path: payload
-                    .get("file_path")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or_default()
-                    .to_string(),
-                resolution: payload
-                    .get("resolution")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or_default()
-                    .to_string(),
-                success_count: payload
-                    .get("success_count")
-                    .and_then(|v| v.as_integer())
-                    .unwrap_or(0) as u32,
-                failure_count: payload
-                    .get("failure_count")
-                    .and_then(|v| v.as_integer())
-                    .unwrap_or(0) as u32,
-                created_at: Utc::now(),
-                last_used_at: Utc::now(),
-                source_commit: payload
-                    .get("source_commit")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or_default()
-                    .to_string(),
-                target_branch: payload
-                    .get("target_branch")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or_default()
-                    .to_string(),
+                id,
+                conflict_signature,
+                file_path,
+                resolution,
+                success_count,
+                failure_count,
+                created_at,
+                last_used_at,
+                source_commit,
+                target_branch,
             };
 
             info!(
@@ -430,21 +468,14 @@ impl CherryPickAgent {
 
     /// Generate embedding using OpenAI API
     async fn generate_embedding(&self, text: &str) -> Result<Vec<f32>> {
-        use async_openai::{
-            config::OpenAIConfig,
-            types::{CreateEmbeddingRequestArgs, EmbeddingInput},
-            Client,
-        };
-
-        let config = OpenAIConfig::new().with_api_key(&self.openai_api_key);
-        let client = Client::with_config(config);
+        use async_openai::types::{CreateEmbeddingRequestArgs, EmbeddingInput};
 
         let request = CreateEmbeddingRequestArgs::default()
             .model("text-embedding-3-small")
             .input(EmbeddingInput::String(text.to_string()))
             .build()?;
 
-        let response = client.embeddings().create(request).await?;
+        let response = self.openai_client.embeddings().create(request).await?;
 
         Ok(response.data[0].embedding.clone())
     }
@@ -551,6 +582,7 @@ impl CherryPickAgent {
         payload.insert("source_commit".to_string(), source_commit.to_string().into());
         payload.insert("target_branch".to_string(), target_branch.to_string().into());
         payload.insert("created_at".to_string(), now.to_rfc3339().into());
+        payload.insert("last_used_at".to_string(), now.to_rfc3339().into());
 
         // Upsert to Qdrant
         self.qdrant
@@ -602,21 +634,20 @@ impl CherryPickAgent {
                         let parent1 = commit.parent(0)?;
                         let parent2 = commit.parent(1)?;
 
+                        // Get diff between the two parents to find conflicts
+                        let parent2_tree = parent2.tree()?;
                         let diff = self.repo.diff_tree_to_tree(
                             Some(&parent1.tree()?),
-                            Some(&commit.tree()?),
+                            Some(&parent2_tree),
                             None,
                         )?;
 
-                        // For each changed file, store as a potential resolution
+                        // Extract conflicts and resolutions from the merge
+                        let mut conflict_files = Vec::new();
                         diff.foreach(
                             &mut |delta, _| {
                                 if let Some(path) = delta.new_file().path() {
-                                    info!(
-                                        file = %path.display(),
-                                        commit = %oid,
-                                        "Found merge resolution candidate"
-                                    );
+                                    conflict_files.push(path.to_path_buf());
                                 }
                                 true
                             },
@@ -625,7 +656,53 @@ impl CherryPickAgent {
                             None,
                         )?;
 
-                        patterns_learned += 1;
+                        // For each conflicted file, extract the resolution
+                        let commit_tree = commit.tree()?;
+                        let parent1_tree = parent1.tree()?;
+                        
+                        for file_path in conflict_files {
+                            // Get the resolved version from the merge commit
+                            if let Ok(blob_entry) = commit_tree.get_path(&file_path) {
+                                if let Ok(resolved_blob) = self.repo.find_blob(blob_entry.id()) {
+                                    let resolution = String::from_utf8_lossy(resolved_blob.content()).to_string();
+                                    
+                                    // Extract conflict signature by comparing parent versions
+                                    let mut conflict_signature = String::new();
+                                    
+                                    // Get parent1 version
+                                    if let Ok(blob1_entry) = parent1_tree.get_path(&file_path) {
+                                        if let Ok(blob1) = self.repo.find_blob(blob1_entry.id()) {
+                                            conflict_signature.push_str("<<<<<<< PARENT1\n");
+                                            conflict_signature.push_str(&String::from_utf8_lossy(blob1.content()));
+                                            conflict_signature.push_str("\n=======\n");
+                                        }
+                                    }
+                                    
+                                    // Get parent2 version
+                                    if let Ok(blob2_entry) = parent2_tree.get_path(&file_path) {
+                                        if let Ok(blob2) = self.repo.find_blob(blob2_entry.id()) {
+                                            conflict_signature.push_str(&String::from_utf8_lossy(blob2.content()));
+                                            conflict_signature.push_str("\n>>>>>>> PARENT2\n");
+                                        }
+                                    }
+                                    
+                                    if !conflict_signature.is_empty() && !resolution.is_empty() {
+                                        // Learn this resolution pattern
+                                        if let Err(e) = self.learn_resolution(
+                                            &conflict_signature,
+                                            &file_path.to_string_lossy(),
+                                            &resolution,
+                                            &oid.to_string(),
+                                            "history",
+                                        ).await {
+                                            warn!(error = %e, file = %file_path.display(), "Failed to learn resolution from history");
+                                        } else {
+                                            patterns_learned += 1;
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
