@@ -66,10 +66,15 @@ jobs:
             EVENT_TYPE="push"
           fi
           
+          # For merges to ta, use "merge" event type
+          if [ "${{ github.event_name }}" == "push" ] && [ "${{ github.ref_name }}" == "ta" ]; then
+            EVENT_TYPE="merge"
+          fi
+          
           bun ci/dagger.ts \
             --branch "${{ github.ref_name }}" \
             --event "$EVENT_TYPE" \
-            --base-branch "${{ github.base_ref }}"
+            --base-branch "${{ github.base_ref || 'ta' }}"
 
       - name: Cleanup agent sandbox (on branch delete)
         if: github.event_name == 'delete' && startsWith(github.ref, 'refs/heads/agent/')
