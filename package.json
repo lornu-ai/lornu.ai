@@ -20,6 +20,6 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@dagger.io/dagger": "^0.9.0"
+    "@dagger.io/dagger": "^0.15.0"
   }
 }
