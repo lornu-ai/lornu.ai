@@ -72,6 +72,10 @@ home = "=0.5.9"
 name = "engine"
 path = "src/main.rs"
 
+[dev-dependencies]
+# Testing utilities
+tempfile = "3.15"
+
 [profile.release]
 opt-level = "z"
 lto = true

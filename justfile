@@ -166,7 +166,7 @@ ci-fast: scan-secrets
     dagger run bun ci/main.ts --skip-infra
 
 # ============================================
-# Clean
+# Clean & Security Lifecycle (Issue #44)
 # ============================================
 
 # Clean all build artifacts
@@ -174,6 +174,27 @@ clean:
     rm -rf services/target
     rm -rf infra/cdk8s.out
     rm -rf infra/node_modules
+
+# Securely wipe all auto-generated artifacts containing secrets
+cleanup:
+    @echo "🔐 Running secure cleanup..."
+    bun run infra/scripts/cleanup.ts
+
+# Preview what would be cleaned (dry run)
+cleanup-dry:
+    @echo "🔍 Previewing secure cleanup (dry run)..."
+    bun run infra/scripts/cleanup.ts --dry-run --verbose
+
+# Full clean: build artifacts + sensitive files
+clean-all: clean cleanup
+    @echo "✅ Full cleanup complete"
+
+# Run a task and then immediately cleanup sensitive files
+sync-and-cleanup task:
+    @echo "🔄 Running task: {{task}}"
+    cargo run -p lornu-engine -- --task {{task}} || true
+    @echo "🧹 Cleaning up..."
+    just cleanup
 
 # ============================================
 # Utilities
