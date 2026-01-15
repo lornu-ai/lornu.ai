@@ -32,6 +32,11 @@ const args = parseArgs({
       description: "Branch to protect (default: ta)",
       default: "ta",
     },
+    "create-teams": {
+      type: "boolean",
+      description: "Create GitHub teams if they don't exist (default: false)",
+      default: false,
+    },
     help: {
       type: "boolean",
       description: "Show help message",
@@ -51,6 +56,7 @@ Options:
   --dry-run              Show what would be done without making changes
   --repo <owner/repo>    Repository (default: lornu-ai/lornu.ai)
   --branch <name>        Branch to protect (default: ta)
+  --create-teams         Create GitHub teams if they don't exist
   --help, -h             Show this help message
 
 Environment Variables:
@@ -81,10 +87,18 @@ if (!GITHUB_TOKEN) {
 const [owner, repo] = args.values.repo!.split("/");
 const branch = args.values.branch!;
 const dryRun = args.values["dry-run"];
+const createTeams = args.values["create-teams"];
 
 const octokit = new Octokit({
   auth: GITHUB_TOKEN,
 });
+
+// Teams required by CODEOWNERS
+const REQUIRED_TEAMS = [
+  { name: "engine-team", description: "Rust engine development team" },
+  { name: "ui-team", description: "Bun/Next.js web application team" },
+  { name: "infra-ops", description: "Infrastructure and CI/CD operations team" },
+];
 
 interface BranchProtectionConfig {
   required_status_checks: {
@@ -202,6 +216,56 @@ async function setDefaultBranch() {
   }
 }
 
+async function createOrVerifyTeams() {
+  console.log(`\n👥 Checking GitHub teams...`);
+
+  for (const team of REQUIRED_TEAMS) {
+    try {
+      // Check if team exists
+      const { data: existingTeam } = await octokit.teams.getByName({
+        org: owner,
+        team_slug: team.name,
+      });
+
+      console.log(`✅ Team '@${team.name}' already exists`);
+    } catch (error: any) {
+      if (error.status === 404) {
+        // Team doesn't exist
+        if (dryRun) {
+          console.log(`📋 Would create team '@${team.name}'`);
+        } else if (createTeams) {
+          try {
+            const { data: newTeam } = await octokit.teams.create({
+              org: owner,
+              name: team.name,
+              description: team.description,
+              privacy: "closed", // Closed teams are visible to organization members
+            });
+            console.log(`✅ Created team '@${team.name}' (ID: ${newTeam.id})`);
+            console.log(`   💡 Add members at: https://github.com/orgs/${owner}/teams/${team.name}/members`);
+          } catch (createError: any) {
+            if (createError.status === 403) {
+              console.error(`❌ Error: Insufficient permissions to create team '@${team.name}'`);
+              console.error("   GITHUB_TOKEN needs 'admin:org' scope for team creation");
+            } else {
+              throw createError;
+            }
+          }
+        } else {
+          console.log(`⚠️  Team '@${team.name}' does not exist`);
+          console.log(`   Run with --create-teams to create it, or create manually in GitHub`);
+        }
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  if (!createTeams && !dryRun) {
+    console.log(`\n💡 Tip: Use --create-teams to automatically create missing teams`);
+  }
+}
+
 async function configureMergeSettings() {
   console.log(`\n🔀 Configuring repository merge settings`);
 
@@ -258,6 +322,11 @@ async function main() {
   console.log(`   Branch: ${branch}\n`);
 
   try {
+    // 0. Create or verify teams (if requested)
+    if (createTeams || dryRun) {
+      await createOrVerifyTeams();
+    }
+
     // 1. Configure merge settings first (easier to change)
     await configureMergeSettings();
 
@@ -272,9 +341,19 @@ async function main() {
       console.log("\n💡 Run without --dry-run to apply these changes");
     } else {
       console.log("\n💡 Next steps:");
-      console.log(`   1. Verify branch protection: https://github.com/${owner}/${repo}/settings/branches`);
-      console.log(`   2. Test by creating a PR targeting '${branch}'`);
-      console.log(`   3. Verify Squash & Merge is the only option available`);
+      if (!createTeams) {
+        console.log(`   1. Create GitHub teams if they don't exist:`);
+        console.log(`      - Run with --create-teams flag, or`);
+        console.log(`      - Create manually: https://github.com/orgs/${owner}/teams`);
+      }
+      console.log(`   ${createTeams ? "1" : "2"}. Verify branch protection: https://github.com/${owner}/${repo}/settings/branches`);
+      console.log(`   ${createTeams ? "2" : "3"}. Add team members to teams (if created):`);
+      REQUIRED_TEAMS.forEach(team => {
+        console.log(`      - @${team.name}: https://github.com/orgs/${owner}/teams/${team.name}/members`);
+      });
+      console.log(`   ${createTeams ? "3" : "4"}. Test by creating a PR targeting '${branch}'`);
+      console.log(`   ${createTeams ? "4" : "5"}. Verify Squash & Merge is the only option available`);
+      console.log(`   ${createTeams ? "5" : "6"}. Verify CODEOWNERS automatically requests reviewers`);
     }
   } catch (error: any) {
     console.error("\n❌ Error:", error.message);
