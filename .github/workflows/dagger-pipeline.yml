@@ -24,7 +24,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -37,7 +36,6 @@ jobs:
         uses: dagger/dagger-for-github@v7
         with:
           version: latest
-
       - name: Determine branch pattern
         id: branch-pattern
         run: |
@@ -53,7 +51,6 @@ jobs:
           else
             echo "pattern=unknown" >> $GITHUB_OUTPUT
           fi
-
       - name: Run Dagger Pipeline
         env:
           DAGGER_LOG_FORMAT: plain
@@ -65,12 +62,12 @@ jobs:
           elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             EVENT_TYPE="push"
           fi
-          
+
           # For merges to ta, use "merge" event type
           if [ "${{ github.event_name }}" == "push" ] && [ "${{ github.ref_name }}" == "ta" ]; then
             EVENT_TYPE="merge"
           fi
-          
+
           bun ci/dagger.ts \
             --branch "${{ github.ref_name }}" \
             --event "$EVENT_TYPE" \

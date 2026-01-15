@@ -12,6 +12,7 @@
     "infra:agent:sandbox:create": "bun infra/agent-sandbox.ts --action create",
     "infra:agent:sandbox:delete": "bun infra/agent-sandbox.ts --action delete",
     "infra:agent:deploy": "bun infra/agent-deploy.ts",
+    "ci:generate-workflow": "bun ci/generate-workflow.ts",
     "ci:generate-tekton": "bun ci/generate-tekton.ts"
   },
   "devDependencies": {
@@ -22,7 +23,7 @@
   },
   "dependencies": {
     "@dagger.io/dagger": "^0.19.10",
-    "@octokit/rest": "^20.0.0",
+    "@octokit/rest": "^22.0.1",
     "@opentelemetry/api": "^1.8.0",
     "@opentelemetry/exporter-trace-otlp-proto": "^0.52.0",
     "@opentelemetry/sdk-trace-base": "^1.26.0",
