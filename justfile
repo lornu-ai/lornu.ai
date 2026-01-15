@@ -154,6 +154,20 @@ apply-dry-run env="dev":
     cd infra && LORNU_ENV={{env}} bun run apply:dry-run
 
 # ============================================
+# AI Agents
+# ============================================
+
+# Train the cherry-pick agent on past PR conflict resolutions
+train-cherry-pick depth="100":
+    @echo "Training cherry-pick agent on Git history..."
+    cd services && cargo run -p lornu-engine -- --task train-cherry-pick --depth {{depth}}
+
+# Run cherry-pick with learning (requires QDRANT_URL and OPENAI_API_KEY)
+cherry-pick commit branch:
+    @echo "Running context-aware cherry-pick..."
+    cd services && cargo run -p lornu-engine -- --task cherry-pick --commit {{commit}} --branch {{branch}}
+
+# ============================================
 # CI/CD
 # ============================================
 

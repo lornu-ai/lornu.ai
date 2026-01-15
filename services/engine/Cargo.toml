@@ -52,6 +52,18 @@ octocrab = "0.41"
 # Base64 encoding for Secret Manager payloads
 base64 = "0.22"
 
+# Git operations for CherryPickAgent
+git2 = "0.19"
+
+# Vector DB for agent learning/memory
+qdrant-client = "1.12"
+
+# Embeddings for similarity search
+async-openai = "0.24"
+
+# Chrono for timestamps
+chrono = { version = "0.4", features = ["serde"] }
+
 # Pin transitive dependency to version compatible with Rust 1.85
 # (home 0.5.12 requires Rust 1.88)
 home = "=0.5.9"
