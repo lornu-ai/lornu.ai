@@ -163,6 +163,8 @@ async function runAgentPipeline(client: Client, source: Directory, branch: strin
   const agentBuild = client
     .container()
     .from("rust:1.85-slim")
+    .withExec(["apt-get", "update"])
+    .withExec(["apt-get", "install", "-y", "pkg-config", "libssl-dev"])
     .withMountedDirectory("/src", source)
     .withWorkdir("/src")
     .withExec(["cargo", "build", "--release", "--bin", agentName]);
@@ -206,6 +208,8 @@ async function runTrunkPipeline(client: Client, source: Directory): Promise<void
   const rustRelease = client
     .container()
     .from("rust:1.85-slim")
+    .withExec(["apt-get", "update"])
+    .withExec(["apt-get", "install", "-y", "pkg-config", "libssl-dev"])
     .withMountedDirectory("/src", source)
     .withWorkdir("/src/services")
     .withExec(["cargo", "build", "--release"]);

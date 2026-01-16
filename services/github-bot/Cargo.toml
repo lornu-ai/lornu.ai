@@ -1,0 +1,35 @@
+[package]
+name = "github-bot"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Rust GitHub bot tools for JWT generation, token exchange, and PR approval"
+
+[[bin]]
+name = "get-token"
+path = "src/bin/get_token.rs"
+
+[[bin]]
+name = "approve-pr"
+path = "src/bin/approve_pr.rs"
+
+[dependencies]
+# Workspace dependencies
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+
+# HTTP client for GitHub API
+reqwest = { version = "0.12", features = ["json"] }
+
+# JWT signing
+jsonwebtoken = "9"
+
+# Time handling
+chrono = "0.4"
+
+# CLI argument parsing
+clap = { version = "4", features = ["derive", "env"] }
