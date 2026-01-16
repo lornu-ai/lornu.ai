@@ -1,0 +1,11 @@
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Provider
+metadata:
+  name: tekton-ci
+  namespace: flux-system
+  labels:
+    lornu.ai/component: flux
+    lornu.ai/managed-by: flux
+spec:
+  type: generic
+  address: http://el-flux-tekton-listener.tekton-pipelines.svc.cluster.local:8080

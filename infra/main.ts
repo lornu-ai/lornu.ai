@@ -1,27 +1,17 @@
 import { App, Chart, ChartProps, ApiObject } from "cdk8s";
 import { Construct } from "constructs";
+import { LornuEnv, LORNU_ENV, lornuLabels } from "./src/base.js";
+import { AiAgentCore } from "./src/ai_agent_core.js";
 import {
   AgentXRDs,
   AgentCompositions,
   ExampleClaims,
   PreviewWorkload,
 } from "./src/constructs";
-
-import { LornuEnv, LORNU_ENV, lornuLabels, LornuConstruct } from "./src/base";
-
 // ============================================================
 // Core Infrastructure Chart (Unified)
 // ============================================================
 
-/**
- * LornuInfra - The unified infrastructure chart
- *
- * This single chart synthesizes all Lornu AI infrastructure:
- * - Hub: Crossplane control plane, provider configs
- * - Spoke: Application deployments, services
- * - GitOps: Flux Kustomizations, image policies
- * - Secrets: ESO ClusterSecretStores
- */
 export class LornuInfra extends Chart {
   public readonly env: LornuEnv;
 
@@ -29,31 +19,15 @@ export class LornuInfra extends Chart {
     super(scope, id, props);
     this.env = LORNU_ENV;
 
-    // --------------------------------------------------------
-    // Hub Infrastructure (Crossplane control plane)
-    // --------------------------------------------------------
     this.synthesizeHub();
-
-    // --------------------------------------------------------
-    // Spoke Applications (Workloads)
-    // --------------------------------------------------------
     this.synthesizeSpoke();
-
-    // --------------------------------------------------------
-    // GitOps (Flux configurations)
-    // --------------------------------------------------------
     this.synthesizeGitOps();
-
-    // --------------------------------------------------------
-    // Secrets (ESO)
-    // --------------------------------------------------------
     this.synthesizeSecrets();
   }
 
   private synthesizeHub(): void {
     console.log(`[Hub] Synthesizing Crossplane control plane for: ${this.env}`);
 
-    // Bootstrap ConfigMap - proves CDK8s → SSA flow works
     new ApiObject(this, "lornu-bootstrap-config", {
       apiVersion: "v1",
       kind: "ConfigMap",
@@ -68,7 +42,6 @@ export class LornuInfra extends Chart {
         SYNTH_TIME: new Date().toISOString(),
       },
     });
-
     // --------------------------------------------------------
     // Crossplane XRDs (AgentMemory, AgentWorker)
     // --------------------------------------------------------
@@ -103,39 +76,28 @@ export class LornuInfra extends Chart {
   private synthesizeSpoke(): void {
     console.log(`[Spoke] Synthesizing applications for: ${this.env}`);
 
-    // Deploy the main preview engine in dev environment
+    const projectId = process.env.GCP_PROJECT_ID || "lornu-ai";
+
     if (this.env === "dev") {
+      // Deploy the main preview engine in dev environment
       new PreviewWorkload(this, "preview-engine", {
         image: "gcr.io/lornu-v2/ai-agent-core:latest",
       });
       console.log(`[Spoke] Created preview workload for ${this.env}`);
+
+      // Fix for Issue #95 - Deploy AiAgentCore with resolving image name
+      new AiAgentCore(this, "ai-agent-core", {
+        projectId: projectId,
+      });
     }
   }
 
   private synthesizeGitOps(): void {
     console.log(`[GitOps] Synthesizing Flux configs for: ${this.env}`);
-
-    // TODO: Add Flux Kustomizations when CRDs are imported
-    // Example:
-    // new Kustomization(this, 'spoke-apps', {
-    //   metadata: { namespace: 'flux-system', labels: lornuLabels('flux') },
-    //   spec: { path: './crossplane/spoke/apps', ... }
-    // });
   }
 
   private synthesizeSecrets(): void {
     console.log(`[Secrets] Synthesizing ESO config for: ${this.env}`);
-
-    // TODO: Add ClusterSecretStore when CRDs are imported
-    // Example:
-    // new ClusterSecretStore(this, 'aws-secrets', {
-    //   metadata: { name: 'aws-secrets-manager-global' },
-    //   spec: { provider: { aws: { region: 'us-east-2' } } }
-    // });
-  }
-
-  private namespace(): string {
-    return `lornu-ai-${this.env}`;
   }
 }
 
@@ -143,7 +105,6 @@ export class LornuInfra extends Chart {
 // Standalone Execution (bun run main.ts)
 // ============================================================
 
-// Only run synthesis when executed directly (not imported)
 const isMainModule = import.meta.main;
 
 if (isMainModule) {
