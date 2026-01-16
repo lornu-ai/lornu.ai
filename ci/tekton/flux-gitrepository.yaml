@@ -1,0 +1,13 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: lornu-ai
+  namespace: flux-system
+  labels:
+    lornu.ai/component: flux
+    lornu.ai/managed-by: flux
+spec:
+  interval: 1m
+  url: https://github.com/lornu-ai/lornu.ai.git
+  ref:
+    branch: ta

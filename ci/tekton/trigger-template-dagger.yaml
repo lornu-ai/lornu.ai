@@ -1,0 +1,50 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: flux-dagger-template
+  namespace: tekton-pipelines
+  labels:
+    lornu.ai/component: tekton
+    lornu.ai/managed-by: flux
+spec:
+  params:
+    - name: repo-url
+      default: https://github.com/lornu-ai/lornu.ai.git
+    - name: revision
+      default: ta
+    - name: event
+      default: push
+    - name: base-branch
+      default: ""
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1
+      kind: PipelineRun
+      metadata:
+        generateName: dagger-ci-flux-
+        namespace: tekton-pipelines
+        labels:
+          lornu.ai/component: tekton
+          lornu.ai/managed-by: flux
+          app.kubernetes.io/part-of: lornu-ai
+          tekton.dev/pipeline: dagger-ci
+      spec:
+        pipelineRef:
+          name: dagger-ci
+        params:
+          - name: repo-url
+            value: $(tt.params.repo-url)
+          - name: revision
+            value: $(tt.params.revision)
+          - name: event
+            value: $(tt.params.event)
+          - name: base-branch
+            value: $(tt.params.base-branch)
+        workspaces:
+          - name: shared-workspace
+            volumeClaimTemplate:
+              spec:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 1Gi

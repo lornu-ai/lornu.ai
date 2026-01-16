@@ -1,0 +1,24 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: flux-tekton-listener
+  namespace: tekton-pipelines
+  labels:
+    lornu.ai/component: tekton
+    lornu.ai/managed-by: flux
+spec:
+  serviceAccountName: tekton-triggers-sa
+  triggers:
+    - name: flux-gitrepo-trigger
+      interceptors:
+        - ref:
+            name: cel
+            kind: ClusterInterceptor
+          params:
+            - name: filter
+              value: >-
+                body.involvedObject.kind == 'GitRepository'
+      bindings:
+        - ref: flux-gitrepo-binding
+      template:
+        ref: flux-dagger-template
