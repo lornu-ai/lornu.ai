@@ -3,14 +3,15 @@
 //! Core orchestration engine with secure tool integrations.
 //! Uses ADC (Application Default Credentials) - no secrets in code.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use axum::{
     extract::State,
     routing::{get, post},
     Json, Router,
 };
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 use tracing::{info, warn, Level};
@@ -19,24 +20,33 @@ use tracing_subscriber::FmtSubscriber;
 mod agents;
 mod tools;
 
-use agents::cyber::zero_trust::ZeroTrustAgent;
 use agents::executor::CrossplaneExecutor;
+use agents::cherry_pick::CherryPickAgent;
 use tools::CloudflareTool;
 
-#[derive(Parser, Debug)]
+#[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-    /// Task to run (e.g., 'cyber')
-    #[arg(long)]
-    task: Option<String>,
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
 
-    /// Sub-agent to run (e.g., 'zero-trust')
-    #[arg(long)]
-    sub_agent: Option<String>,
-
-    /// Mode of operation (e.g., 'audit', 'harden')
-    #[arg(long)]
-    mode: Option<String>,
+#[derive(Subcommand)]
+enum Commands {
+    /// Start the API server (default)
+    Server,
+    /// Train the cherry-pick agent
+    TrainCherryPick {
+        #[arg(long, default_value = "100")]
+        depth: u32,
+    },
+    /// Run a context-aware cherry-pick
+    CherryPick {
+        #[arg(long)]
+        commit: String,
+        #[arg(long)]
+        branch: String,
+    },
 }
 
 #[derive(Clone)]
@@ -54,32 +64,49 @@ async fn main() -> Result<()> {
 
     let cli = Cli::parse();
 
-    if let Some(task) = cli.task {
-        if task == "cyber" {
-            if let Some(sub_agent) = cli.sub_agent {
-                if sub_agent == "zero-trust" {
-                    let mode = cli.mode.unwrap_or_else(|| "audit".to_string());
-                    info!("Running Zero Trust Agent in {} mode", mode);
+    match cli.command.unwrap_or(Commands::Server) {
+        Commands::Server => run_server().await,
+        Commands::TrainCherryPick { depth } => run_train_cherry_pick(depth).await,
+        Commands::CherryPick { commit, branch } => run_cherry_pick(commit, branch).await,
+    }
+}
 
-                    let agent = ZeroTrustAgent::new(90)?;
+async fn run_train_cherry_pick(depth: u32) -> Result<()> {
+    info!("Starting CherryPickAgent training (depth: {})", depth);
 
-                    match mode.as_str() {
-                        "audit" | "harden" => {
-                            let corrections = agent.run_hardening_pass().await?;
-                            info!("Found {} corrections", corrections.len());
-                            for c in corrections {
-                                info!("Correction: {} -> {}", c.sa_email, c.new_role);
-                            }
-                        }
-                        _ => warn!("Unknown mode: {}", mode),
-                    }
-                    return Ok(());
-                }
-            }
-        }
+    let agent = create_cherry_pick_agent().await?;
+    let count = agent.train_on_history(depth).await?;
+
+    info!("Training complete. Learned {} patterns.", count);
+    Ok(())
+}
+
+async fn run_cherry_pick(commit: String, branch: String) -> Result<()> {
+    info!("Running CherryPickAgent (commit: {}, branch: {})", commit, branch);
+
+    let agent = create_cherry_pick_agent().await?;
+    let result = agent.execute_and_learn(&commit, &branch).await?;
+
+    info!("Cherry-pick result: {:?}", result);
+
+    if !result.success {
+        std::process::exit(1);
     }
 
-    info!("Starting Lornu AI Engine");
+    Ok(())
+}
+
+async fn create_cherry_pick_agent() -> Result<CherryPickAgent> {
+    let repo_path = std::env::current_dir()?;
+    let qdrant_url = std::env::var("QDRANT_URL").unwrap_or_else(|_| "http://localhost:6333".to_string());
+    let openai_api_key = std::env::var("OPENAI_API_KEY")
+        .context("OPENAI_API_KEY environment variable must be set")?;
+
+    CherryPickAgent::new(&repo_path, &qdrant_url, openai_api_key).await
+}
+
+async fn run_server() -> Result<()> {
+    info!("Starting Lornu AI Engine Server");
 
     // Initialize Crossplane executor
     let executor = Arc::new(CrossplaneExecutor::new().await?);
@@ -91,18 +118,12 @@ async fn main() -> Result<()> {
             Some(Arc::new(tool))
         }
         Err(e) => {
-            warn!(
-                "CloudflareTool not available: {} (set LORNU_GCP_PROJECT to enable)",
-                e
-            );
+            warn!("CloudflareTool not available: {} (set LORNU_GCP_PROJECT to enable)", e);
             None
         }
     };
 
-    let state = AppState {
-        executor,
-        cloudflare,
-    };
+    let state = AppState { executor, cloudflare };
 
     let app = Router::new()
         .route("/health", get(health_check))
@@ -143,31 +164,21 @@ struct ProvisionMemoryRequest {
     size: String,
 }
 
-fn default_provider() -> String {
-    "gcp".to_string()
-}
-fn default_memory_type() -> String {
-    "postgres".to_string()
-}
-fn default_size() -> String {
-    "10Gi".to_string()
-}
+fn default_provider() -> String { "gcp".to_string() }
+fn default_memory_type() -> String { "postgres".to_string() }
+fn default_size() -> String { "10Gi".to_string() }
 
 async fn provision_memory(
     State(state): State<AppState>,
     Json(req): Json<ProvisionMemoryRequest>,
 ) -> Json<serde_json::Value> {
-    match state
-        .executor
-        .provision_agent_memory(
-            &req.user,
-            &req.agent,
-            &req.provider,
-            &req.memory_type,
-            &req.size,
-        )
-        .await
-    {
+    match state.executor.provision_agent_memory(
+        &req.user,
+        &req.agent,
+        &req.provider,
+        &req.memory_type,
+        &req.size,
+    ).await {
         Ok(name) => Json(serde_json::json!({
             "status": "provisioned",
             "claim_name": name
@@ -190,25 +201,19 @@ struct ProvisionWorkerRequest {
     replicas: i32,
 }
 
-fn default_replicas() -> i32 {
-    1
-}
+fn default_replicas() -> i32 { 1 }
 
 async fn provision_worker(
     State(state): State<AppState>,
     Json(req): Json<ProvisionWorkerRequest>,
 ) -> Json<serde_json::Value> {
-    match state
-        .executor
-        .provision_agent_worker(
-            &req.user,
-            &req.agent,
-            req.gpu,
-            req.gpu_type.as_deref(),
-            req.replicas,
-        )
-        .await
-    {
+    match state.executor.provision_agent_worker(
+        &req.user,
+        &req.agent,
+        req.gpu,
+        req.gpu_type.as_deref(),
+        req.replicas,
+    ).await {
         Ok(name) => Json(serde_json::json!({
             "status": "provisioned",
             "claim_name": name
@@ -246,9 +251,7 @@ struct CreateDnsRequest {
     proxied: bool,
 }
 
-fn default_proxied() -> bool {
-    true
-}
+fn default_proxied() -> bool { true }
 
 async fn create_dns_record(
     State(state): State<AppState>,
@@ -256,18 +259,18 @@ async fn create_dns_record(
 ) -> Json<serde_json::Value> {
     let cloudflare = match &state.cloudflare {
         Some(cf) => cf,
-        None => {
-            return Json(serde_json::json!({
-                "status": "error",
-                "message": "CloudflareTool not configured (set LORNU_GCP_PROJECT)"
-            }))
-        }
+        None => return Json(serde_json::json!({
+            "status": "error",
+            "message": "CloudflareTool not configured (set LORNU_GCP_PROJECT)"
+        })),
     };
 
-    match cloudflare
-        .create_dns_record(req.zone_id.as_deref(), &req.name, &req.content, req.proxied)
-        .await
-    {
+    match cloudflare.create_dns_record(
+        req.zone_id.as_deref(),
+        &req.name,
+        &req.content,
+        req.proxied,
+    ).await {
         Ok(record_id) => Json(serde_json::json!({
             "status": "created",
             "record_id": record_id,
@@ -291,12 +294,10 @@ async fn list_dns_records(
 ) -> Json<serde_json::Value> {
     let cloudflare = match &state.cloudflare {
         Some(cf) => cf,
-        None => {
-            return Json(serde_json::json!({
-                "status": "error",
-                "message": "CloudflareTool not configured"
-            }))
-        }
+        None => return Json(serde_json::json!({
+            "status": "error",
+            "message": "CloudflareTool not configured"
+        })),
     };
 
     match cloudflare.list_dns_records(query.zone_id.as_deref()).await {

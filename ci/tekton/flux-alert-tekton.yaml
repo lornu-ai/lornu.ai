@@ -1,0 +1,17 @@
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Alert
+metadata:
+  name: lornu-ai-tekton-alert
+  namespace: flux-system
+  labels:
+    lornu.ai/component: flux
+    lornu.ai/managed-by: flux
+spec:
+  providerRef:
+    name: tekton-ci
+  eventSeverity: info
+  eventSources:
+    - kind: GitRepository
+      name: lornu-ai
+      namespace: flux-system
+  summary: "Flux GitRepository event → Tekton PipelineRun trigger"

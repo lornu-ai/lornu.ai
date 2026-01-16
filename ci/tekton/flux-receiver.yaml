@@ -1,0 +1,19 @@
+apiVersion: notification.toolkit.fluxcd.io/v1
+kind: Receiver
+metadata:
+  name: lornu-ai-github
+  namespace: flux-system
+  labels:
+    lornu.ai/environment: production
+    lornu.ai/component: flux
+    lornu.ai/managed-by: flux
+spec:
+  type: github
+  events:
+    - push
+  secretRef:
+    name: github-webhook-token
+  resources:
+    - apiVersion: source.toolkit.fluxcd.io/v1
+      kind: GitRepository
+      name: lornu-ai

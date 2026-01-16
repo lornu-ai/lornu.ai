@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "synth": "bun run main.ts",
+    "synth": "cdk8s synth",
     "synth:dev": "LORNU_ENV=dev bun run main.ts",
     "synth:staging": "LORNU_ENV=staging bun run main.ts",
     "synth:prod": "LORNU_ENV=prod bun run main.ts",

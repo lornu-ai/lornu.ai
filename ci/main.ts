@@ -24,6 +24,13 @@ async function pipeline() {
       exclude: ['node_modules', 'target', '.git', 'cdk8s.out'],
     });
 
+    // Define cache volumes
+    const cargoRegistryCache = client.cacheVolume('cargo-registry');
+    const cargoTargetCache = client.cacheVolume('cargo-target');
+    const bunCache = client.cacheVolume('bun-cache');
+    const aptCache = client.cacheVolume('apt-cache');
+    const aptLibCache = client.cacheVolume('apt-lib-cache');
+
     console.log('Starting Lornu AI CI Pipeline');
     console.log(`   Environment: ${ENV}`);
     console.log(`   Skip Infra: ${SKIP_INFRA}`);
@@ -37,22 +44,26 @@ async function pipeline() {
     const rustBuilder = client
       .container()
       .from('rust:1.83-slim')
+      .withMountedCache('/var/cache/apt', aptCache)
+      .withMountedCache('/var/lib/apt', aptLibCache)
       .withExec(['apt-get', 'update'])
       .withExec(['apt-get', 'install', '-y', 'pkg-config', 'libssl-dev'])
+      .withMountedCache('/usr/local/cargo/registry', cargoRegistryCache)
+      .withMountedCache('/src/target', cargoTargetCache)
       .withDirectory('/src', src)
       .withWorkdir('/src');
 
     const engineBuild = rustBuilder
       .withWorkdir('/src/services/engine')
-      .withExec(['cargo', 'build', '--release']);
+      .withExec(['cargo', 'build', '--release', '--locked']);
 
     const gatewayBuild = rustBuilder
       .withWorkdir('/src/services/gateway')
-      .withExec(['cargo', 'build', '--release']);
+      .withExec(['cargo', 'build', '--release', '--locked']);
 
     const workerBuild = rustBuilder
       .withWorkdir('/src/services/agent-worker')
-      .withExec(['cargo', 'build', '--release']);
+      .withExec(['cargo', 'build', '--release', '--locked']);
 
     // =========================================
     // Stage 2: Infrastructure (Crossplane)
@@ -63,6 +74,8 @@ async function pipeline() {
       const infraContainer = client
         .container()
         .from('oven/bun:latest')
+        .withMountedCache('/var/cache/apt', aptCache)
+        .withMountedCache('/var/lib/apt', aptLibCache)
         .withDirectory('/src', src)
         .withWorkdir('/src')
         .withExec(['sh', '-c',
@@ -85,6 +98,7 @@ async function pipeline() {
       const synthManifests = client
         .container()
         .from('oven/bun:latest')
+        .withMountedCache('/root/.bun/install/cache', bunCache)
         .withDirectory('/src', src)
         .withWorkdir('/src/infra')
         .withExec(['bun', 'install'])
