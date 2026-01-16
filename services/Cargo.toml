@@ -4,6 +4,7 @@ members = [
     "engine",
     "gateway",
     "agent-worker",
+    "github-bot",
 ]
 
 [workspace.package]

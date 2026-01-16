@@ -1,8 +1,12 @@
 import { App, Chart, ChartProps, ApiObject } from "cdk8s";
 import { Construct } from "constructs";
-import { LornuConstruct, LornuEnv, LORNU_ENV, lornuLabels } from "./src/base.js";
-import { PreviewWorkload } from "./src/preview.js";
+import { LornuEnv, LORNU_ENV, lornuLabels } from "./src/base.js";
 import { AiAgentCore } from "./src/ai_agent_core.js";
+import {
+  AgentXRDs,
+  AgentCompositions,
+  ExampleClaims,
+} from "./src/constructs";
 
 // ============================================================
 // Core Infrastructure Chart (Unified)
@@ -38,6 +42,35 @@ export class LornuInfra extends Chart {
         SYNTH_TIME: new Date().toISOString(),
       },
     });
+    // --------------------------------------------------------
+    // Crossplane XRDs (AgentMemory, AgentWorker)
+    // --------------------------------------------------------
+    new AgentXRDs(this, "agent-xrds", { env: this.env });
+
+    // --------------------------------------------------------
+    // Crossplane Compositions (GCP implementations)
+    // --------------------------------------------------------
+    new AgentCompositions(this, "agent-compositions", { env: this.env });
+
+    // --------------------------------------------------------
+    // Example Claims (for testing/demonstration)
+    // Only create in dev environment to avoid prod resource creation
+    // --------------------------------------------------------
+    if (this.env === "dev") {
+      const ns = `lornu-ai-${this.env}`;
+      new ExampleClaims(this, "example-claims", {
+        namespace: ns,
+        env: this.env,
+      });
+      console.log(`[Hub] Created example claims in ${ns}`);
+    }
+
+    // TODO: Add Crossplane ProviderConfigs when CRDs are imported
+    // Example:
+    // new ProviderConfig(this, 'gcp-provider', {
+    //   metadata: { name: 'gcp-default', labels: lornuLabels('crossplane') },
+    //   spec: { projectID: '${GCP_PROJECT_ID}' }
+    // });
   }
 
   private synthesizeSpoke(): void {
@@ -46,11 +79,9 @@ export class LornuInfra extends Chart {
     const projectId = process.env.GCP_PROJECT_ID || "lornu-ai";
 
     if (this.env === "dev") {
-      new PreviewWorkload(this, "preview-workload");
-
       // Fix for Issue #95 - Deploy AiAgentCore with resolving image name
       new AiAgentCore(this, "ai-agent-core", {
-        projectId: projectId
+        projectId: projectId,
       });
     }
   }
