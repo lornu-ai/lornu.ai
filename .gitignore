@@ -8,7 +8,7 @@ Icon
 .Trashes
 
 # === Rust (services/engine) ===
-/target/
+target/
 **/*.rs.bk
 Cargo.lock
 # Keep Cargo.lock at the root if it's a workspace,
