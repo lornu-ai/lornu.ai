@@ -1,13 +1,13 @@
 steps:
   # Build the dns-sync-agent binary using Rust
-  - name: 'rust:1.83-slim'
+  - name: 'rust:latest'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
         apt-get update && apt-get install -y --no-install-recommends pkg-config libssl-dev ca-certificates && rm -rf /var/lib/apt/lists/*
         cd services/engine
-        cargo build --release --bin dns-sync-agent --no-default-features --features dns-sync
+        cargo build --release --bin dns-sync-agent
         cp target/release/dns-sync-agent /workspace/dns-sync-agent
         # Create minimal Dockerfile
         cat > /workspace/Dockerfile.runtime <<'DOCKERFILE'

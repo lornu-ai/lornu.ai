@@ -65,11 +65,6 @@ qdrant-client = { version = "1.12", optional = true }
 # Git operations (optional - for cherry-pick agent)
 git2 = { version = "0.19", optional = true }
 
-[features]
-default = ["full"]
-full = ["gcloud-sdk", "cloudflare", "octocrab", "async-openai", "qdrant-client", "git2"]
-dns-sync = []  # Minimal features for dns-sync-agent
-
 # Chrono for timestamps
 chrono = { version = "0.4", features = ["serde"] }
 
@@ -79,6 +74,12 @@ clap = { version = "4.5", features = ["derive", "env"] }
 # Pin transitive dependency to version compatible with Rust 1.85
 # (home 0.5.12 requires Rust 1.88)
 home = "=0.5.9"
+
+[features]
+default = ["full"]
+full = ["gcloud-sdk", "cloudflare", "octocrab", "async-openai", "qdrant-client", "git2"]
+# dns-sync includes all deps for now (lib.rs exports modules that use them)
+dns-sync = ["gcloud-sdk", "cloudflare", "octocrab", "async-openai", "qdrant-client", "git2"]
 
 [[bin]]
 name = "engine"
