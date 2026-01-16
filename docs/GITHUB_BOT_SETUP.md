@@ -85,24 +85,21 @@ Generate an installation token:
 
 ```bash
 # TypeScript/Bun
-bun src/bin/generate-github-app-token.ts \
+TOKEN=$(bun src/bin/generate-github-app-token.ts \
   --app-id 123456 \
   --private-key ./lornu-ai-bot.pem \
-  --installation-id 78901234
+  --installation-id 78901234)
 
 # Or Rust (faster)
-cargo run --bin get-token -p github-bot -- \
+TOKEN=$(cargo run --bin get-token -p github-bot -- \
   --app-id 123456 \
   --private-key-path ./lornu-ai-bot.pem \
-  --installation-id 78901234
+  --installation-id 78901234)
 ```
 
 Approve a PR:
 
 ```bash
-# Get token first
-TOKEN=$(bun src/bin/generate-github-app-token.ts --app-id ... --private-key ... --installation-id ...)
-
 # TypeScript/Bun
 bun src/bin/approve-prs-with-bot.ts \
   --repo lornu-ai/lornu.ai \
@@ -212,29 +209,6 @@ spec:
         key: lornu-github-app-private-key
 ```
 
-## Troubleshooting
-
-### "Cannot approve your own pull request"
-
-- Ensure you're using the bot's token, not your personal token
-- The GitHub App must be a different identity than the PR author
-
-### "Resource not accessible by integration"
-
-- Install the GitHub App on the repository
-- Check installation settings in the app's "Install App" section
-
-### "Bad credentials"
-
-- Verify App ID, Installation ID, and private key are correct
-- Ensure the private key is in PEM format
-- JWT tokens expire after 10 minutes - generate a fresh token
-
-### "Installation not found"
-
-- Verify the installation ID matches your organization
-- Ensure the app is installed on the target repository
-
 ## Alternative: Personal Access Token
 
 If you prefer a simpler setup without GitHub Apps:
@@ -252,8 +226,34 @@ bun src/bin/approve-prs-with-bot.ts \
 
 Note: GitHub Apps are recommended for better security and fine-grained permissions.
 
+## Troubleshooting
+
+### "Cannot approve your own pull request"
+
+- Ensure you're using the bot's token, not your personal token
+- The GitHub App must be a different identity than the PR author
+- For GitHub Apps, ensure the app is installed and you're using the installation token
+- Check that the token has `pull_requests: write` permission
+
+### "Resource not accessible by integration"
+
+- Install the GitHub App on the repository
+- Check installation settings in the app's "Install App" section
+
+### "Bad credentials"
+
+- Verify App ID, Installation ID, and private key are correct
+- Ensure the private key is in PEM format
+- JWT tokens expire after 10 minutes - generate a fresh token
+
+### "Installation not found"
+
+- Verify the installation ID matches your organization
+- Ensure the app is installed on the target repository
+
 ## Related
 
 - [GitHub Apps Documentation](https://docs.github.com/en/apps)
+- [Personal Access Tokens Documentation](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token)
 - Issues: #24, #60, #61
 - PR: #29, #63
