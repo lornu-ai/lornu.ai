@@ -5,7 +5,7 @@
 
 #![allow(dead_code)]
 use anyhow::{Context, Result};
-use base64::Engine;
+
 use clap::Parser;
 use kube::{Api, Client};
 use k8s_openapi::api::networking::v1::Ingress;
@@ -60,8 +60,9 @@ async fn main() -> Result<()> {
         "Starting DNS Sync Agent (Rust)"
     );
 
-    // Get Cloudflare API token from environment or Secret Manager
-    let api_token = get_cloudflare_token().await?;
+    // Get Cloudflare API token from environment (populated by External Secrets Operator)
+    let api_token = env::var("CLOUDFLARE_API_TOKEN")
+        .context("CLOUDFLARE_API_TOKEN must be set in the environment (ensure ESO or K8s Secrets are configured)")?;
 
     // Initialize Cloudflare client
     let cf_client = CloudflareDnsClient::new(api_token, args.zone_id.clone())?;
@@ -224,96 +225,4 @@ async fn run_sync(
     );
 
     Ok(())
-}
-
-/// Get Cloudflare API token from environment or GCP Secret Manager
-async fn get_cloudflare_token() -> Result<String> {
-    // First try environment variable
-    if let Ok(token) = env::var("CLOUDFLARE_API_TOKEN") {
-        if !token.is_empty() {
-            info!("Using Cloudflare token from environment");
-            return Ok(token);
-        }
-    }
-
-    // Try GCP Secret Manager
-    let project_id = env::var("LORNU_GCP_PROJECT")
-        .or_else(|_| env::var("GCP_PROJECT"))
-        .context("No GCP project ID found in environment")?;
-
-    info!(project = %project_id, "Fetching Cloudflare token from Secret Manager");
-
-    // Get GCP access token via metadata server or gcloud
-    let gcp_token = get_gcp_access_token().await?;
-
-    // Fetch secret
-    let secret_name = env::var("CLOUDFLARE_SECRET_ID")
-        .unwrap_or_else(|_| "CLOUDFLARE_API_TOKEN".to_string());
-
-    let url = format!(
-        "https://secretmanager.googleapis.com/v1/projects/{}/secrets/{}/versions/latest:access",
-        project_id, secret_name
-    );
-
-    let client = reqwest::Client::new();
-    let response = client
-        .get(&url)
-        .bearer_auth(&gcp_token)
-        .send()
-        .await
-        .context("Failed to call Secret Manager")?;
-
-    if !response.status().is_success() {
-        anyhow::bail!("Secret Manager returned {}", response.status());
-    }
-
-    let data: serde_json::Value = response.json().await?;
-    let payload_b64 = data["payload"]["data"]
-        .as_str()
-        .context("Secret payload not found")?;
-
-    let payload = base64::engine::general_purpose::STANDARD
-        .decode(payload_b64)
-        .context("Failed to decode secret payload")?;
-
-    Ok(String::from_utf8(payload)?.trim().to_string())
-}
-
-/// Get GCP access token from metadata server or gcloud CLI
-async fn get_gcp_access_token() -> Result<String> {
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(5))
-        .build()?;
-
-    // Try metadata server first (GKE with Workload Identity)
-    // NOTE: Metadata server is HTTP-only by design and only accessible internally.
-    // This URL is acknowledged as secure because it never leaves the internal VPC.
-    let metadata_url = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
-
-    if let Ok(resp) = client
-        .get(metadata_url)
-        .header("Metadata-Flavor", "Google")
-        .send()
-        .await
-    {
-        if resp.status().is_success() {
-            let data: serde_json::Value = resp.json().await?;
-            if let Some(token) = data["access_token"].as_str() {
-                return Ok(token.to_string());
-            }
-        }
-    }
-
-    // Fall back to gcloud CLI
-    let output = tokio::process::Command::new("gcloud")
-        .args(["auth", "application-default", "print-access-token"])
-        .output()
-        .await
-        .context("Failed to run gcloud CLI")?;
-
-    if !output.status.success() {
-        anyhow::bail!("gcloud auth failed: {}", String::from_utf8_lossy(&output.stderr));
-    }
-
-    Ok(String::from_utf8(output.stdout)?.trim().to_string())
 }
