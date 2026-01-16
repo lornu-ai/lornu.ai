@@ -153,7 +153,6 @@ impl FederatedIdentityManager {
         let response = self
             .http_client
             .get(&sts_url)
-            .header("Accept", "application/json")
             .send()
             .await
             .context("Failed to call AWS STS")?;
