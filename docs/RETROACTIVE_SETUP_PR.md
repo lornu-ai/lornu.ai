@@ -45,4 +45,4 @@ These were foundational setup tasks needed to establish the repository structure
 ## Related
 
 - [Trunk-Based Workflow](./TRUNK_BASED_WORKFLOW.md)
-- [Branch Setup Guide](./.github/BRANCH_SETUP.md)
+- [Branch Setup Guide](../.github/BRANCH_SETUP.md)
