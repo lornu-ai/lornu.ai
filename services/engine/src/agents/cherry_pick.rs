@@ -34,7 +34,6 @@ const MIN_SIMILARITY_SCORE: f32 = 0.85;
 
 /// Minimum success rate threshold to automatically apply a resolution
 const MIN_SUCCESS_RATE_THRESHOLD: f32 = 0.7;
-
 /// A stored conflict resolution pattern
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResolutionPattern {
@@ -115,8 +114,7 @@ impl CherryPickAgent {
         qdrant_url: &str,
         openai_api_key: String,
     ) -> Result<Self> {
-        use async_openai::Client;
-
+        use async_openai::{config::OpenAIConfig, Client};
         let repo = Repository::open(repo_path)
             .with_context(|| format!("Failed to open repository at {:?}", repo_path))?;
 
@@ -571,7 +569,7 @@ impl CherryPickAgent {
         let embedding = self.generate_embedding(conflict_signature).await?;
 
         // Create payload
-        let mut payload = HashMap::new();
+        let mut payload: HashMap<String, qdrant_client::qdrant::Value> = HashMap::new();
         payload.insert("id".to_string(), id.to_string().into());
         payload.insert(
             "conflict_signature".to_string(),
