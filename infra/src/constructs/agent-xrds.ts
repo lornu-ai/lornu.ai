@@ -294,7 +294,7 @@ export class AgentCompositions extends Construct {
                                 containers: [
                                   {
                                     name: "worker",
-                                    image: "lornu-agent-worker:latest",
+                                    image: "gcr.io/gcp-lornu-ai/lornu-agent-worker:latest",
                                     resources: {
                                       limits: { cpu: "1", memory: "2Gi" },
                                     },
