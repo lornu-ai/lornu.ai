@@ -6,7 +6,7 @@ import {
   AgentXRDs,
   AgentCompositions,
   ExampleClaims,
-} from "./src/constructs";
+} from "./src/constructs/index.js";
 
 // ============================================================
 // Core Infrastructure Chart (Unified)

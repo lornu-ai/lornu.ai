@@ -12,18 +12,22 @@ export const lornuLabels = (component: string, env: LornuEnv = LORNU_ENV) => ({
   "app.kubernetes.io/part-of": "lornu-ai",
 });
 
-// Base construct that auto-injects Lornu labels
+/**
+ * Base construct that auto-injects Lornu labels
+ */
 export abstract class LornuConstruct extends Construct {
   protected readonly env: LornuEnv;
   protected readonly labels: Record<string, string>;
+  protected readonly customNamespace?: string;
 
-  constructor(scope: Construct, id: string, component: string) {
+  constructor(scope: Construct, id: string, component: string, customNamespace?: string) {
     super(scope, id);
     this.env = LORNU_ENV;
-    this.labels = lornuLabels(component);
+    this.labels = lornuLabels(component, this.env);
+    this.customNamespace = customNamespace;
   }
 
   protected namespace(): string {
-    return `lornu-ai-${this.env}`;
+    return this.customNamespace || `lornu-ai-${this.env}`;
   }
 }
