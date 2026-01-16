@@ -69,7 +69,7 @@ git2 = "0.19"
 chrono = { version = "0.4", features = ["serde"] }
 
 # CLI argument parsing
-clap = { version = "4.5", features = ["derive"] }
+clap = { version = "4.5", features = ["derive", "env"] }
 
 # Pin transitive dependency to version compatible with Rust 1.85
 # (home 0.5.12 requires Rust 1.88)
@@ -78,6 +78,10 @@ home = "=0.5.9"
 [[bin]]
 name = "engine"
 path = "src/main.rs"
+
+[[bin]]
+name = "dns-sync-agent"
+path = "src/bin/dns_sync_agent.rs"
 
 [dev-dependencies]
 # Testing utilities

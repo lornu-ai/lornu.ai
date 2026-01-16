@@ -18,7 +18,9 @@
 mod types;
 mod providers;
 mod orchestrator;
+pub mod cloudflare;
 pub mod cloudflare_permissions;
 
 pub use orchestrator::MultiCloudDnsSyncAgent;
+pub use cloudflare::{CloudflareDnsClient, DnsRecordType, DnsRecordSyncResult, IngressDnsMapping};
 pub use cloudflare_permissions::{CloudflareConfig, TokenPolicy, permission_groups};
