@@ -489,6 +489,7 @@ impl MultiCloudDnsSyncAgent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::types::{CloudEndpoint, PoolOrigin};
 
     #[test]
     fn test_pool_origin_conversion() {
