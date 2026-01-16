@@ -19,29 +19,16 @@ scan-secrets:
     set -uo pipefail
     echo "Scanning for secrets..."
 
-    PATTERNS=(
-        'sk-[a-zA-Z0-9]{20,}'
-        'AIza[a-zA-Z0-9_-]{35}'
-        'AKIA[A-Z0-9]{16}'
-        'ghp_[a-zA-Z0-9]{36}'
-        'gho_[a-zA-Z0-9]{36}'
-        'glpat-[a-zA-Z0-9_-]{20}'
-        'xox[baprs]-[a-zA-Z0-9-]+'
-        '"password":\s*"[^"]+'
-        '"api_key":\s*"[^"]+'
-        '"secret":\s*"[^"]+'
-    )
+    PATTERN='(sk-[a-zA-Z0-9]{20,}|AIza[a-zA-Z0-9_-]{35}|AKIA[A-Z0-9]{16}|ghp_[a-zA-Z0-9]{36}|gho_[a-zA-Z0-9]{36}|glpat-[a-zA-Z0-9_-]{20}|xox[baprs]-[a-zA-Z0-9-]+|"password":\s*"[^"]+|"api_key":\s*"[^"]+|"secret":\s*"[^"]+)'
 
     FOUND=0
-    for pattern in "${PATTERNS[@]}"; do
-        # Use || true to handle grep returning 1 when no matches (which is what we want)
-        matches=$(grep -rE "$pattern" --include='*.rs' --include='*.ts' --include='*.json' --include='*.yaml' --include='*.yml' . 2>/dev/null | grep -v 'justfile' | grep -v '.git' || true)
-        if [ -n "$matches" ]; then
-            echo "$matches"
-            echo "WARNING: Potential secret found matching pattern: $pattern"
-            FOUND=1
-        fi
-    done
+    # Use || true to handle grep returning 1 when no matches (which is what we want)
+    matches=$(grep -rE "$PATTERN" --include='*.rs' --include='*.ts' --include='*.json' --include='*.yaml' --include='*.yml' . 2>/dev/null | grep -v 'justfile' | grep -v '.git' || true)
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "WARNING: Potential secrets found!"
+        FOUND=1
+    fi
 
     # Check for GCP service account keys
     sa_files=$(find . -name "*.json" -exec grep -l '"type": "service_account"' {} \; 2>/dev/null | grep -v node_modules || true)
@@ -79,7 +66,7 @@ setup:
 
 # Start infrastructure (synth CDK8s manifests)
 dev-infra:
-    cd infra && bun install && bun run synth
+    cd infra && bun run synth
 
 # Build Rust services in development mode
 dev-services:
@@ -98,7 +85,7 @@ build-services:
 
 # Build/synthesize infrastructure manifests
 build-infra:
-    cd infra && bun install && bun run synth
+    cd infra && bun run synth
 
 # ============================================
 # Test
