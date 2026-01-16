@@ -117,71 +117,16 @@ impl MultiCloudDnsSyncAgent {
         })
     }
 
-    /// Fetch Cloudflare API token from Secret Manager
+    /// Fetch Cloudflare API token from environment
+    /// 
+    /// In production, use External Secrets Operator (ESO) with OIDC to inject
+    /// the token as a `CLOUDFLARE_API_TOKEN` environment variable. ESO handles
+    /// secret retrieval from Google Secret Manager securely.
+    /// 
+    /// For local development, set the environment variable manually.
     async fn get_cloudflare_token(&self) -> Result<String> {
-        // Try GCE metadata server first (GKE with Workload Identity)
-        // NOTE: Metadata server is HTTP-only by design and only accessible internally.
-        // Security check is acknowledged as this never leaves the internal network.
-        let metadata_url = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
-
-        let gcp_token = match self
-            .http_client
-            .get(metadata_url)
-            .header("Metadata-Flavor", "Google")
-            .send()
-            .await
-        {
-            Ok(resp) if resp.status().is_success() => {
-                let token_response: serde_json::Value = resp.json().await?;
-                token_response["access_token"]
-                    .as_str()
-                    .context("Invalid token response")?
-                    .to_string()
-            }
-            _ => {
-                // Fall back to gcloud CLI for local development
-                let output = tokio::process::Command::new("gcloud")
-                    .args(["auth", "application-default", "print-access-token"])
-                    .output()
-                    .await
-                    .context("Failed to run gcloud CLI")?;
-
-                if !output.status.success() {
-                    anyhow::bail!("gcloud auth failed");
-                }
-
-                String::from_utf8(output.stdout)?.trim().to_string()
-            }
-        };
-
-        // Fetch Cloudflare token from Secret Manager
-        let secret_url = format!(
-            "https://secretmanager.googleapis.com/v1/projects/{}/secrets/{}/versions/latest:access",
-            self.gcp_project_id, self.cloudflare_secret_id
-        );
-
-        let response = self
-            .http_client
-            .get(&secret_url)
-            .bearer_auth(&gcp_token)
-            .send()
-            .await
-            .context("Failed to call Secret Manager")?;
-
-        if !response.status().is_success() {
-            anyhow::bail!("Secret Manager returned {}", response.status());
-        }
-
-        let secret_response: serde_json::Value = response.json().await?;
-        let payload_base64 = secret_response["payload"]["data"]
-            .as_str()
-            .context("Secret payload not found")?;
-
-        let payload_bytes = base64::engine::general_purpose::STANDARD
-            .decode(payload_base64)
-            .context("Failed to decode secret payload")?;
-
-        Ok(String::from_utf8(payload_bytes)?.trim().to_string())
+        env::var("CLOUDFLARE_API_TOKEN")
+            .context("CLOUDFLARE_API_TOKEN environment variable not set. Configure ESO or set it manually.")
     }
 
     /// Sync multi-cloud endpoints to Cloudflare Load Balancer Pool
@@ -357,6 +302,7 @@ impl MultiCloudDnsSyncAgent {
     }
 
     /// Get Cloudflare account ID
+    /// Uses HTTPS to securely transmit bearer token
     async fn get_account_id(&self, token: &str) -> Result<String> {
         let response = self
             .http_client
@@ -376,6 +322,7 @@ impl MultiCloudDnsSyncAgent {
     }
 
     /// Create or update a Load Balancer Pool
+    /// All API calls use HTTPS to securely transmit credentials and account data
     async fn upsert_pool(&self, token: &str, pool: &LoadBalancerPool) -> Result<String> {
         let account_id = self.get_account_id(token).await?;
         let base_url = format!(
@@ -383,7 +330,7 @@ impl MultiCloudDnsSyncAgent {
             account_id
         );
 
-        // Check if pool exists
+        // Check if pool exists - uses HTTPS with bearer token authentication
         let list_response = self
             .http_client
             .get(&base_url)
@@ -420,7 +367,7 @@ impl MultiCloudDnsSyncAgent {
         });
 
         let response = if let Some(existing) = existing_pool {
-            // Update existing pool
+            // Update existing pool via HTTPS with bearer token
             info!("Updating existing pool: {}", existing.id);
             self.http_client
                 .put(format!("{}/{}", base_url, existing.id))
@@ -429,7 +376,7 @@ impl MultiCloudDnsSyncAgent {
                 .send()
                 .await?
         } else {
-            // Create new pool
+            // Create new pool via HTTPS with bearer token
             info!("Creating new pool: {}", pool.name);
             self.http_client
                 .post(&base_url)
