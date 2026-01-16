@@ -3,13 +3,15 @@
 //! Core orchestration engine with secure tool integrations.
 //! Uses ADC (Application Default Credentials) - no secrets in code.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use axum::{
     extract::State,
     routing::{get, post},
     Json, Router,
 };
+use clap::{Parser, Subcommand};
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 use tracing::{info, warn, Level};
@@ -19,7 +21,33 @@ mod agents;
 mod tools;
 
 use agents::executor::CrossplaneExecutor;
+use agents::cherry_pick::CherryPickAgent;
 use tools::CloudflareTool;
+
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Start the API server (default)
+    Server,
+    /// Train the cherry-pick agent
+    TrainCherryPick {
+        #[arg(long, default_value = "100")]
+        depth: u32,
+    },
+    /// Run a context-aware cherry-pick
+    CherryPick {
+        #[arg(long)]
+        commit: String,
+        #[arg(long)]
+        branch: String,
+    },
+}
 
 #[derive(Clone)]
 struct AppState {
@@ -34,7 +62,51 @@ async fn main() -> Result<()> {
         .json()
         .init();
 
-    info!("Starting Lornu AI Engine");
+    let cli = Cli::parse();
+
+    match cli.command.unwrap_or(Commands::Server) {
+        Commands::Server => run_server().await,
+        Commands::TrainCherryPick { depth } => run_train_cherry_pick(depth).await,
+        Commands::CherryPick { commit, branch } => run_cherry_pick(commit, branch).await,
+    }
+}
+
+async fn run_train_cherry_pick(depth: u32) -> Result<()> {
+    info!("Starting CherryPickAgent training (depth: {})", depth);
+
+    let agent = create_cherry_pick_agent().await?;
+    let count = agent.train_on_history(depth).await?;
+
+    info!("Training complete. Learned {} patterns.", count);
+    Ok(())
+}
+
+async fn run_cherry_pick(commit: String, branch: String) -> Result<()> {
+    info!("Running CherryPickAgent (commit: {}, branch: {})", commit, branch);
+
+    let agent = create_cherry_pick_agent().await?;
+    let result = agent.execute_and_learn(&commit, &branch).await?;
+
+    info!("Cherry-pick result: {:?}", result);
+
+    if !result.success {
+        std::process::exit(1);
+    }
+
+    Ok(())
+}
+
+async fn create_cherry_pick_agent() -> Result<CherryPickAgent> {
+    let repo_path = std::env::current_dir()?;
+    let qdrant_url = std::env::var("QDRANT_URL").unwrap_or_else(|_| "http://localhost:6333".to_string());
+    let openai_api_key = std::env::var("OPENAI_API_KEY")
+        .context("OPENAI_API_KEY environment variable must be set")?;
+
+    CherryPickAgent::new(&repo_path, &qdrant_url, openai_api_key).await
+}
+
+async fn run_server() -> Result<()> {
+    info!("Starting Lornu AI Engine Server");
 
     // Initialize Crossplane executor
     let executor = Arc::new(CrossplaneExecutor::new().await?);

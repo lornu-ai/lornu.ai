@@ -1,0 +1,429 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/name: bootstrap
+    app.kubernetes.io/part-of: lornu-ai
+    lornu.ai/environment: dev
+    lornu.ai/managed-by: crossplane
+  name: lornu-bootstrap-config
+  namespace: default
+data:
+  LORNU_ENV: dev
+  MANAGED_BY: cdk8s-ssa
+  SYNTH_TIME: "2026-01-16T14:12:52.113Z"
+---
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  labels:
+    lornu.ai/environment: dev
+    lornu.ai/managed-by: crossplane
+  name: agentmemories.lornu.ai
+spec:
+  claimNames:
+    kind: AgentMemoryClaim
+    plural: agentmemoryclaims
+  group: lornu.ai
+  names:
+    kind: AgentMemory
+    plural: agentmemories
+  versions:
+    - name: v1alpha1
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          properties:
+            spec:
+              properties:
+                provider:
+                  description: Cloud provider for the memory resource
+                  enum:
+                    - gcp
+                    - aws
+                    - azure
+                  type: string
+                size:
+                  default: 10Gi
+                  description: Storage size
+                  type: string
+                tier:
+                  default: small
+                  description: Performance tier
+                  enum:
+                    - small
+                    - medium
+                    - large
+                  type: string
+                type:
+                  description: Type of memory/database
+                  enum:
+                    - postgres
+                    - redis
+                    - qdrant
+                    - elasticsearch
+                  type: string
+              required:
+                - provider
+                - type
+              type: object
+          type: object
+      served: true
+---
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  labels:
+    lornu.ai/environment: dev
+    lornu.ai/managed-by: crossplane
+  name: agentworkers.lornu.ai
+spec:
+  claimNames:
+    kind: AgentWorkerClaim
+    plural: agentworkerclaims
+  group: lornu.ai
+  names:
+    kind: AgentWorker
+    plural: agentworkers
+  versions:
+    - name: v1alpha1
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          properties:
+            spec:
+              properties:
+                gpu:
+                  default: false
+                  description: Whether GPU is required
+                  type: boolean
+                gpuType:
+                  description: Type of GPU (if gpu=true)
+                  enum:
+                    - nvidia-tesla-t4
+                    - nvidia-tesla-a100
+                    - nvidia-l4
+                  type: string
+                provider:
+                  description: Cloud provider for compute
+                  enum:
+                    - gcp
+                    - aws
+                    - azure
+                  type: string
+                replicas:
+                  default: 1
+                  description: Number of worker replicas
+                  maximum: 10
+                  minimum: 1
+                  type: integer
+                timeout:
+                  default: 30m
+                  description: Maximum execution timeout
+                  type: string
+              required:
+                - provider
+              type: object
+          type: object
+      served: true
+---
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  labels:
+    crossplane.io/xrd: agentmemories.lornu.ai
+    lornu.ai/environment: dev
+    lornu.ai/managed-by: crossplane
+    provider: gcp
+  name: agentmemory-gcp-cloudsql
+spec:
+  compositeTypeRef:
+    apiVersion: lornu.ai/v1alpha1
+    kind: AgentMemory
+  mode: Pipeline
+  pipeline:
+    - functionRef:
+        name: function-patch-and-transform
+      input:
+        apiVersion: pt.fn.crossplane.io/v1beta1
+        kind: Resources
+        resources:
+          - base:
+              apiVersion: sql.gcp.upbound.io/v1beta1
+              kind: DatabaseInstance
+              spec:
+                forProvider:
+                  databaseVersion: POSTGRES_15
+                  deletionProtection: false
+                  region: us-central1
+                  settings:
+                    - diskSize: 10
+                      diskType: PD_SSD
+                      tier: db-f1-micro
+            name: cloudsql-instance
+            patches:
+              - fromFieldPath: spec.size
+                toFieldPath: spec.forProvider.settings[0].diskSize
+                transforms:
+                  - string:
+                      trim: Gi
+                      type: TrimSuffix
+                    type: string
+                  - convert:
+                      toType: int
+                    type: convert
+                type: FromCompositeFieldPath
+              - fromFieldPath: spec.tier
+                toFieldPath: spec.forProvider.settings[0].tier
+                transforms:
+                  - map:
+                      large: db-custom-4-8192
+                      medium: db-custom-2-4096
+                      small: db-f1-micro
+                    type: map
+                type: FromCompositeFieldPath
+      step: patch-and-transform
+---
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  labels:
+    crossplane.io/xrd: agentworkers.lornu.ai
+    lornu.ai/environment: dev
+    lornu.ai/managed-by: crossplane
+    provider: gcp
+  name: agentworker-gcp-gke
+spec:
+  compositeTypeRef:
+    apiVersion: lornu.ai/v1alpha1
+    kind: AgentWorker
+  mode: Pipeline
+  pipeline:
+    - functionRef:
+        name: function-patch-and-transform
+      input:
+        apiVersion: pt.fn.crossplane.io/v1beta1
+        kind: Resources
+        resources:
+          - base:
+              apiVersion: kubernetes.crossplane.io/v1alpha2
+              kind: Object
+              spec:
+                forProvider:
+                  manifest:
+                    apiVersion: batch/v1
+                    kind: Job
+                    metadata:
+                      namespace: lornu-ai
+                    spec:
+                      backoffLimit: 3
+                      template:
+                        spec:
+                          containers:
+                            - image: lornu-agent-worker:latest
+                              name: worker
+                              resources:
+                                limits:
+                                  cpu: "1"
+                                  memory: 2Gi
+                          restartPolicy: Never
+            name: worker-job
+            patches:
+              - fromFieldPath: spec.gpu
+                toFieldPath: spec.forProvider.manifest.spec.template.spec.containers[0].resources.limits[nvidia.com/gpu]
+                transforms:
+                  - convert:
+                      format: "%d"
+                      toType: string
+                    type: convert
+                type: FromCompositeFieldPath
+      step: patch-and-transform
+---
+apiVersion: lornu.ai/v1alpha1
+kind: AgentMemoryClaim
+metadata:
+  labels:
+    lornu.ai/environment: dev
+    lornu.ai/managed-by: cdk8s
+    lornu.ai/provider: gcp
+    lornu.ai/type: postgres
+  name: example-memory-postgres
+  namespace: lornu-ai-dev
+spec:
+  provider: gcp
+  size: 10Gi
+  tier: small
+  type: postgres
+---
+apiVersion: lornu.ai/v1alpha1
+kind: AgentMemoryClaim
+metadata:
+  labels:
+    lornu.ai/environment: dev
+    lornu.ai/managed-by: cdk8s
+    lornu.ai/provider: gcp
+    lornu.ai/type: redis
+  name: example-memory-redis
+  namespace: lornu-ai-dev
+spec:
+  provider: gcp
+  size: 5Gi
+  tier: small
+  type: redis
+---
+apiVersion: lornu.ai/v1alpha1
+kind: AgentMemoryClaim
+metadata:
+  labels:
+    lornu.ai/environment: dev
+    lornu.ai/managed-by: cdk8s
+    lornu.ai/provider: gcp
+    lornu.ai/type: qdrant
+  name: example-memory-qdrant
+  namespace: lornu-ai-dev
+spec:
+  provider: gcp
+  size: 20Gi
+  tier: medium
+  type: qdrant
+---
+apiVersion: lornu.ai/v1alpha1
+kind: AgentWorkerClaim
+metadata:
+  labels:
+    lornu.ai/environment: dev
+    lornu.ai/gpu: "true"
+    lornu.ai/managed-by: cdk8s
+    lornu.ai/provider: gcp
+  name: example-worker-gpu
+  namespace: lornu-ai-dev
+spec:
+  gpu: true
+  gpuType: nvidia-tesla-t4
+  provider: gcp
+  replicas: 1
+  timeout: 1h
+---
+apiVersion: lornu.ai/v1alpha1
+kind: AgentWorkerClaim
+metadata:
+  labels:
+    lornu.ai/environment: dev
+    lornu.ai/gpu: "false"
+    lornu.ai/managed-by: cdk8s
+    lornu.ai/provider: gcp
+  name: example-worker-cpu
+  namespace: lornu-ai-dev
+spec:
+  gpu: false
+  provider: gcp
+  replicas: 3
+  timeout: 30m
+---
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  labels:
+    app.kubernetes.io/name: ai-agent-core
+    app.kubernetes.io/part-of: lornu-ai
+    lornu.ai/environment: dev
+    lornu.ai/eso-sync: "true"
+    lornu.ai/managed-by: crossplane
+  name: lornu-cluster-vars
+  namespace: ai-agent-core
+spec:
+  dataFrom:
+    - extract:
+        key: lornu/cluster-vars
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: cluster-secret-store-aws
+  target:
+    name: lornu-cluster-vars
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/name: ai-agent-core
+    app.kubernetes.io/part-of: lornu-ai
+    lornu.ai/environment: dev
+    lornu.ai/managed-by: crossplane
+  name: ai-agent-core
+  namespace: ai-agent-core
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ai-agent-core
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ai-agent-core
+        app.kubernetes.io/part-of: lornu-ai
+        lornu.ai/environment: dev
+        lornu.ai/managed-by: crossplane
+    spec:
+      containers:
+        - envFrom:
+            - secretRef:
+                name: lornu-cluster-vars
+          image: us-central1-docker.pkg.dev/lornu-ai/lornu-ai/ai-agent-core:latest
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          name: main
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-agent-core
+  namespace: ai-agent-core
+spec:
+  ports:
+    - port: 80
+      protocol: TCP
+      targetPort: 8080
+  selector:
+    app.kubernetes.io/name: ai-agent-core
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.allow-http: "true"
+    kubernetes.io/ingress.class: gce
+    networking.gke.io/managed-certificates: lornu-preview-cert
+  name: ai-agent-core-ingress
+  namespace: ai-agent-core
+spec:
+  rules:
+    - host: preview.lornu.ai
+      http:
+        paths:
+          - backend:
+              service:
+                name: ai-agent-core
+                port:
+                  number: 80
+            path: /
+            pathType: Prefix

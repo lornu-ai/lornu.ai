@@ -53,13 +53,13 @@ octocrab = "0.41"
 base64 = "0.22"
 
 # OpenAI client for embeddings
-async-openai = "0.21"
+async-openai = "0.24"
 
 # Qdrant vector database client
-qdrant-client = "1.11"
+qdrant-client = "1.12"
 
 # Git operations
-git2 = "0.18"
+git2 = "0.19"
 
 # Chrono for timestamps
 chrono = { version = "0.4", features = ["serde"] }
@@ -67,10 +67,15 @@ chrono = { version = "0.4", features = ["serde"] }
 # Pin transitive dependency to version compatible with Rust 1.85
 # (home 0.5.12 requires Rust 1.88)
 home = "=0.5.9"
+clap = { version = "4.5.54", features = ["derive"] }
 
 [[bin]]
 name = "engine"
 path = "src/main.rs"
+
+[dev-dependencies]
+# Testing utilities
+tempfile = "3.15"
 
 [profile.release]
 opt-level = "z"

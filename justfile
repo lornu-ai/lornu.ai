@@ -19,29 +19,16 @@ scan-secrets:
     set -uo pipefail
     echo "Scanning for secrets..."
 
-    PATTERNS=(
-        'sk-[a-zA-Z0-9]{20,}'
-        'AIza[a-zA-Z0-9_-]{35}'
-        'AKIA[A-Z0-9]{16}'
-        'ghp_[a-zA-Z0-9]{36}'
-        'gho_[a-zA-Z0-9]{36}'
-        'glpat-[a-zA-Z0-9_-]{20}'
-        'xox[baprs]-[a-zA-Z0-9-]+'
-        '"password":\s*"[^"]+'
-        '"api_key":\s*"[^"]+'
-        '"secret":\s*"[^"]+'
-    )
+    PATTERN='(sk-[a-zA-Z0-9]{20,}|AIza[a-zA-Z0-9_-]{35}|AKIA[A-Z0-9]{16}|ghp_[a-zA-Z0-9]{36}|gho_[a-zA-Z0-9]{36}|glpat-[a-zA-Z0-9_-]{20}|xox[baprs]-[a-zA-Z0-9-]+|"password":\s*"[^"]+|"api_key":\s*"[^"]+|"secret":\s*"[^"]+)'
 
     FOUND=0
-    for pattern in "${PATTERNS[@]}"; do
-        # Use || true to handle grep returning 1 when no matches (which is what we want)
-        matches=$(grep -rE "$pattern" --include='*.rs' --include='*.ts' --include='*.json' --include='*.yaml' --include='*.yml' . 2>/dev/null | grep -v 'justfile' | grep -v '.git' || true)
-        if [ -n "$matches" ]; then
-            echo "$matches"
-            echo "WARNING: Potential secret found matching pattern: $pattern"
-            FOUND=1
-        fi
-    done
+    # Use || true to handle grep returning 1 when no matches (which is what we want)
+    matches=$(grep -rE "$PATTERN" --include='*.rs' --include='*.ts' --include='*.json' --include='*.yaml' --include='*.yml' . 2>/dev/null | grep -v 'justfile' | grep -v '.git' || true)
+    if [ -n "$matches" ]; then
+        echo "$matches"
+        echo "WARNING: Potential secrets found!"
+        FOUND=1
+    fi
 
     # Check for GCP service account keys
     sa_files=$(find . -name "*.json" -exec grep -l '"type": "service_account"' {} \; 2>/dev/null | grep -v node_modules || true)
@@ -79,7 +66,7 @@ setup:
 
 # Start infrastructure (synth CDK8s manifests)
 dev-infra:
-    cd infra && bun install && bun run synth
+    cd infra && bun run synth
 
 # Build Rust services in development mode
 dev-services:
@@ -98,7 +85,7 @@ build-services:
 
 # Build/synthesize infrastructure manifests
 build-infra:
-    cd infra && bun install && bun run synth
+    cd infra && bun run synth
 
 # ============================================
 # Test
@@ -154,6 +141,59 @@ apply-dry-run env="dev":
     cd infra && LORNU_ENV={{env}} bun run apply:dry-run
 
 # ============================================
+# AI Agents (Issue #37)
+# ============================================
+
+# Train the cherry-pick agent on past PR conflict resolutions
+train-cherry-pick depth="100":
+    @echo "Training cherry-pick agent on Git history..."
+    cd services && cargo run -p lornu-engine -- train-cherry-pick --depth {{depth}}
+
+# Run cherry-pick with learning (requires QDRANT_URL and OPENAI_API_KEY)
+cherry-pick commit branch:
+    @echo "Running context-aware cherry-pick..."
+    cd services && cargo run -p lornu-engine -- cherry-pick --commit {{commit}} --branch {{branch}}
+
+# ============================================
+# Zero Trust Security Agent (Issue #52)
+# ============================================
+
+# Run Zero Trust IAM scan (requires ADC and QDRANT_URL)
+zero-trust-scan project:
+    @echo "Running Zero Trust IAM scan for project {{project}}..."
+    cd services && LORNU_GCP_PROJECT={{project}} cargo run -p lornu-engine -- --task zero-trust-scan
+
+# Run Zero Trust scan and generate remediation PR
+zero-trust-remediate project org="lornu-ai" repo="lornu.ai":
+    @echo "Running Zero Trust scan and creating remediation PR..."
+    cd services && \
+        LORNU_GCP_PROJECT={{project}} \
+        GITHUB_ORG={{org}} \
+        GITHUB_REPO={{repo}} \
+        cargo run -p lornu-engine -- --task zero-trust-remediate
+
+# Train Zero Trust agent on historical IAM changes
+train-zero-trust depth="50":
+    @echo "Training Zero Trust agent on IAM history..."
+    cd services && cargo run -p lornu-engine -- --task train-zero-trust --depth {{depth}}
+
+# List unused IAM roles via gcloud (90+ days inactive)
+list-unused-roles project:
+    @echo "Listing unused IAM roles for project {{project}}..."
+    gcloud recommender insights list \
+        --project={{project}} \
+        --insight-type=google.iam.policy.Insight \
+        --location=global \
+        --filter="stateInfo.state=ACTIVE" \
+        --format="table(name,insightSubtype,associatedRecommendations)"
+
+# Check secret ages in Secret Manager
+check-secret-ages project:
+    @echo "Checking secret ages in project {{project}}..."
+    gcloud secrets list --project={{project}} \
+        --format="table(name,createTime,replication.automatic)"
+
+# ============================================
 # CI/CD
 # ============================================
 
@@ -166,7 +206,7 @@ ci-fast: scan-secrets
     dagger run bun ci/main.ts --skip-infra
 
 # ============================================
-# Clean
+# Clean & Security Lifecycle (Issue #44)
 # ============================================
 
 # Clean all build artifacts
@@ -174,6 +214,27 @@ clean:
     rm -rf services/target
     rm -rf infra/cdk8s.out
     rm -rf infra/node_modules
+
+# Securely wipe all auto-generated artifacts containing secrets
+cleanup:
+    @echo "🔐 Running secure cleanup..."
+    bun run infra/scripts/cleanup.ts
+
+# Preview what would be cleaned (dry run)
+cleanup-dry:
+    @echo "🔍 Previewing secure cleanup (dry run)..."
+    bun run infra/scripts/cleanup.ts --dry-run --verbose
+
+# Full clean: build artifacts + sensitive files
+clean-all: clean cleanup
+    @echo "✅ Full cleanup complete"
+
+# Run a task and then immediately cleanup sensitive files
+sync-and-cleanup task:
+    @echo "🔄 Running task: {{task}}"
+    cargo run -p lornu-engine -- --task {{task}} || true
+    @echo "🧹 Cleaning up..."
+    just cleanup
 
 # ============================================
 # Utilities
