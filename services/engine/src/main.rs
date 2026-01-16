@@ -19,8 +19,8 @@ use tracing_subscriber::FmtSubscriber;
 mod agents;
 mod tools;
 
-use agents::executor::CrossplaneExecutor;
 use agents::cyber::zero_trust::ZeroTrustAgent;
+use agents::executor::CrossplaneExecutor;
 use tools::CloudflareTool;
 
 #[derive(Parser, Debug)]
@@ -60,9 +60,9 @@ async fn main() -> Result<()> {
                 if sub_agent == "zero-trust" {
                     let mode = cli.mode.unwrap_or_else(|| "audit".to_string());
                     info!("Running Zero Trust Agent in {} mode", mode);
-                    
-                    let agent = ZeroTrustAgent::new(90)?; 
-                    
+
+                    let agent = ZeroTrustAgent::new(90)?;
+
                     match mode.as_str() {
                         "audit" | "harden" => {
                             let corrections = agent.run_hardening_pass().await?;
@@ -91,12 +91,18 @@ async fn main() -> Result<()> {
             Some(Arc::new(tool))
         }
         Err(e) => {
-            warn!("CloudflareTool not available: {} (set LORNU_GCP_PROJECT to enable)", e);
+            warn!(
+                "CloudflareTool not available: {} (set LORNU_GCP_PROJECT to enable)",
+                e
+            );
             None
         }
     };
 
-    let state = AppState { executor, cloudflare };
+    let state = AppState {
+        executor,
+        cloudflare,
+    };
 
     let app = Router::new()
         .route("/health", get(health_check))
@@ -137,21 +143,31 @@ struct ProvisionMemoryRequest {
     size: String,
 }
 
-fn default_provider() -> String { "gcp".to_string() }
-fn default_memory_type() -> String { "postgres".to_string() }
-fn default_size() -> String { "10Gi".to_string() }
+fn default_provider() -> String {
+    "gcp".to_string()
+}
+fn default_memory_type() -> String {
+    "postgres".to_string()
+}
+fn default_size() -> String {
+    "10Gi".to_string()
+}
 
 async fn provision_memory(
     State(state): State<AppState>,
     Json(req): Json<ProvisionMemoryRequest>,
 ) -> Json<serde_json::Value> {
-    match state.executor.provision_agent_memory(
-        &req.user,
-        &req.agent,
-        &req.provider,
-        &req.memory_type,
-        &req.size,
-    ).await {
+    match state
+        .executor
+        .provision_agent_memory(
+            &req.user,
+            &req.agent,
+            &req.provider,
+            &req.memory_type,
+            &req.size,
+        )
+        .await
+    {
         Ok(name) => Json(serde_json::json!({
             "status": "provisioned",
             "claim_name": name
@@ -174,19 +190,25 @@ struct ProvisionWorkerRequest {
     replicas: i32,
 }
 
-fn default_replicas() -> i32 { 1 }
+fn default_replicas() -> i32 {
+    1
+}
 
 async fn provision_worker(
     State(state): State<AppState>,
     Json(req): Json<ProvisionWorkerRequest>,
 ) -> Json<serde_json::Value> {
-    match state.executor.provision_agent_worker(
-        &req.user,
-        &req.agent,
-        req.gpu,
-        req.gpu_type.as_deref(),
-        req.replicas,
-    ).await {
+    match state
+        .executor
+        .provision_agent_worker(
+            &req.user,
+            &req.agent,
+            req.gpu,
+            req.gpu_type.as_deref(),
+            req.replicas,
+        )
+        .await
+    {
         Ok(name) => Json(serde_json::json!({
             "status": "provisioned",
             "claim_name": name
@@ -224,7 +246,9 @@ struct CreateDnsRequest {
     proxied: bool,
 }
 
-fn default_proxied() -> bool { true }
+fn default_proxied() -> bool {
+    true
+}
 
 async fn create_dns_record(
     State(state): State<AppState>,
@@ -232,18 +256,18 @@ async fn create_dns_record(
 ) -> Json<serde_json::Value> {
     let cloudflare = match &state.cloudflare {
         Some(cf) => cf,
-        None => return Json(serde_json::json!({
-            "status": "error",
-            "message": "CloudflareTool not configured (set LORNU_GCP_PROJECT)"
-        })),
+        None => {
+            return Json(serde_json::json!({
+                "status": "error",
+                "message": "CloudflareTool not configured (set LORNU_GCP_PROJECT)"
+            }))
+        }
     };
 
-    match cloudflare.create_dns_record(
-        req.zone_id.as_deref(),
-        &req.name,
-        &req.content,
-        req.proxied,
-    ).await {
+    match cloudflare
+        .create_dns_record(req.zone_id.as_deref(), &req.name, &req.content, req.proxied)
+        .await
+    {
         Ok(record_id) => Json(serde_json::json!({
             "status": "created",
             "record_id": record_id,
@@ -267,10 +291,12 @@ async fn list_dns_records(
 ) -> Json<serde_json::Value> {
     let cloudflare = match &state.cloudflare {
         Some(cf) => cf,
-        None => return Json(serde_json::json!({
-            "status": "error",
-            "message": "CloudflareTool not configured"
-        })),
+        None => {
+            return Json(serde_json::json!({
+                "status": "error",
+                "message": "CloudflareTool not configured"
+            }))
+        }
     };
 
     match cloudflare.list_dns_records(query.zone_id.as_deref()).await {

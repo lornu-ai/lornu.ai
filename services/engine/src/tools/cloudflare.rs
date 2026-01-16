@@ -71,8 +71,8 @@ impl CloudflareTool {
         let project_id = env::var("LORNU_GCP_PROJECT")
             .context("LORNU_GCP_PROJECT must be set - this should be injected by K8s")?;
 
-        let secret_id = env::var("CLOUDFLARE_SECRET_ID")
-            .unwrap_or_else(|_| "CLOUDFLARE_API_TOKEN".to_string());
+        let secret_id =
+            env::var("CLOUDFLARE_SECRET_ID").unwrap_or_else(|_| "CLOUDFLARE_API_TOKEN".to_string());
 
         let default_zone_id = env::var("CLOUDFLARE_ZONE_ID").ok();
 
@@ -225,7 +225,10 @@ impl CloudflareTool {
             .or_else(|| self.default_zone_id.clone())
             .context("Zone ID must be provided or set via CLOUDFLARE_ZONE_ID")?;
 
-        info!("Creating DNS record: {} -> {} (proxied: {})", name, content, proxied);
+        info!(
+            "Creating DNS record: {} -> {} (proxied: {})",
+            name, content, proxied
+        );
 
         let token = self.get_api_token().await?;
 
@@ -257,7 +260,11 @@ impl CloudflareTool {
             .context("Failed to parse Cloudflare response")?;
 
         if !cf_response.success {
-            let errors: Vec<String> = cf_response.errors.iter().map(|e| e.message.clone()).collect();
+            let errors: Vec<String> = cf_response
+                .errors
+                .iter()
+                .map(|e| e.message.clone())
+                .collect();
             anyhow::bail!("Cloudflare error: {}", errors.join(", "));
         }
 
@@ -297,7 +304,11 @@ impl CloudflareTool {
             .context("Failed to parse Cloudflare response")?;
 
         if !cf_response.success {
-            let errors: Vec<String> = cf_response.errors.iter().map(|e| e.message.clone()).collect();
+            let errors: Vec<String> = cf_response
+                .errors
+                .iter()
+                .map(|e| e.message.clone())
+                .collect();
             anyhow::bail!("Cloudflare error: {}", errors.join(", "));
         }
 
@@ -333,7 +344,11 @@ impl CloudflareTool {
             .context("Failed to parse Cloudflare response")?;
 
         if !cf_response.success {
-            let errors: Vec<String> = cf_response.errors.iter().map(|e| e.message.clone()).collect();
+            let errors: Vec<String> = cf_response
+                .errors
+                .iter()
+                .map(|e| e.message.clone())
+                .collect();
             anyhow::bail!("Cloudflare error: {}", errors.join(", "));
         }
 
@@ -345,7 +360,8 @@ impl CloudflareTool {
 fn base64_decode(input: &str) -> Result<Vec<u8>> {
     use std::io::Read;
     let bytes = input.as_bytes();
-    let mut decoder = base64::read::DecoderReader::new(bytes, &base64::engine::general_purpose::STANDARD);
+    let mut decoder =
+        base64::read::DecoderReader::new(bytes, &base64::engine::general_purpose::STANDARD);
     let mut output = Vec::new();
     decoder.read_to_end(&mut output)?;
     Ok(output)
@@ -361,6 +377,9 @@ mod tests {
         env::remove_var("LORNU_GCP_PROJECT");
         let result = CloudflareTool::new();
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("LORNU_GCP_PROJECT"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("LORNU_GCP_PROJECT"));
     }
 }

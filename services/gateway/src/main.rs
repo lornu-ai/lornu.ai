@@ -40,10 +40,14 @@ async fn main() -> Result<()> {
         .build()?;
 
     let mut routes = HashMap::new();
-    routes.insert("engine".to_string(),
-        env::var("ENGINE_URL").unwrap_or_else(|_| "http://engine:8080".to_string()));
-    routes.insert("worker".to_string(),
-        env::var("WORKER_URL").unwrap_or_else(|_| "http://agent-worker:8082".to_string()));
+    routes.insert(
+        "engine".to_string(),
+        env::var("ENGINE_URL").unwrap_or_else(|_| "http://engine:8080".to_string()),
+    );
+    routes.insert(
+        "worker".to_string(),
+        env::var("WORKER_URL").unwrap_or_else(|_| "http://agent-worker:8082".to_string()),
+    );
 
     let state = AppState {
         http_client,
@@ -84,8 +88,13 @@ async fn proxy_request(
 
     let target_url = match state.routes.get(*service) {
         Some(url) => format!("{}/{}", url, remaining),
-        None => return (StatusCode::NOT_FOUND,
-            Json(serde_json::json!({"error": "service_not_found"}))).into_response(),
+        None => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "service_not_found"})),
+            )
+                .into_response()
+        }
     };
 
     info!("Proxying to: {}", target_url);
@@ -102,8 +111,13 @@ async fn proxy_request(
 
     let body_bytes = match axum::body::to_bytes(request.into_body(), usize::MAX).await {
         Ok(bytes) => bytes,
-        Err(e) => return (StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+                .into_response()
+        }
     };
 
     if !body_bytes.is_empty() {
@@ -119,7 +133,10 @@ async fn proxy_request(
                 .body(Body::from(body))
                 .unwrap_or_else(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Error").into_response())
         }
-        Err(e) => (StatusCode::BAD_GATEWAY,
-            Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
 }

@@ -186,7 +186,10 @@ impl CrossplaneExecutor {
     pub async fn list_agent_resources(&self) -> Result<Vec<serde_json::Value>> {
         let mut resources = Vec::new();
 
-        for (kind, plural) in [("AgentMemory", "agentmemories"), ("AgentWorker", "agentworkers")] {
+        for (kind, plural) in [
+            ("AgentMemory", "agentmemories"),
+            ("AgentWorker", "agentworkers"),
+        ] {
             let ar = ApiResource {
                 group: "lornu.ai".to_string(),
                 version: "v1alpha1".to_string(),
