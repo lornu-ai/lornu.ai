@@ -4,6 +4,7 @@ metadata:
   name: lornu-ai-github
   namespace: flux-system
   labels:
+    lornu.ai/environment: production
     lornu.ai/component: flux
     lornu.ai/managed-by: flux
 spec:

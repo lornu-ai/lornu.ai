@@ -4,6 +4,7 @@ metadata:
   name: flux-dagger-template
   namespace: tekton-pipelines
   labels:
+    lornu.ai/environment: production
     lornu.ai/component: tekton
     lornu.ai/managed-by: flux
 spec:
@@ -11,7 +12,7 @@ spec:
     - name: repo-url
       default: https://github.com/lornu-ai/lornu.ai.git
     - name: revision
-      default: ta
+      default: main
     - name: event
       default: push
     - name: base-branch
@@ -23,6 +24,7 @@ spec:
         generateName: dagger-ci-flux-
         namespace: tekton-pipelines
         labels:
+          lornu.ai/environment: production
           lornu.ai/component: tekton
           lornu.ai/managed-by: flux
           app.kubernetes.io/part-of: lornu-ai

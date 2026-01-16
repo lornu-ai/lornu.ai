@@ -4,6 +4,7 @@ metadata:
   name: tekton-triggers-sa
   namespace: tekton-pipelines
   labels:
+    lornu.ai/environment: production
     lornu.ai/component: tekton
     lornu.ai/managed-by: flux
 ---
@@ -13,6 +14,7 @@ metadata:
   name: tekton-triggers-role
   namespace: tekton-pipelines
   labels:
+    lornu.ai/environment: production
     lornu.ai/component: tekton
     lornu.ai/managed-by: flux
 rules:
@@ -36,6 +38,7 @@ metadata:
   name: tekton-triggers-binding
   namespace: tekton-pipelines
   labels:
+    lornu.ai/environment: production
     lornu.ai/component: tekton
     lornu.ai/managed-by: flux
 subjects:
