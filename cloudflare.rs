@@ -77,15 +77,7 @@ pub async fn upsert_dns_record(params: &UpsertDnsParams) -> Result<()> {
         params.zone_id
     );
 
-    // 1. Check if a record with this name already exists
-    let list_url = format!("{}?name={}", api_url, params.name);
-    let list_response = client
-        .get(&list_url)
-        .bearer_auth(&token)
-        .send()
-        .await?
-        .json::<CloudflareResponse<Vec<DnsRecord>>>()
-        .await?;
+    // 1. Check if a record with this name already exists using the helper
     let list_response: CloudflareResponse<Vec<DnsRecord>> = execute_request(
         &client,
         reqwest::Method::GET,
@@ -93,12 +85,6 @@ pub async fn upsert_dns_record(params: &UpsertDnsParams) -> Result<()> {
         None::<&()>, // No body for GET request
     )
     .await?;
-
-    if !list_response.success {
-        return Err(anyhow!("Failed to list DNS records: {:?}", list_response.errors));
-    }
-    // The execute_request function already checks for success,
-    // so we can proceed directly.
 
     let existing_record = list_response.result.iter().find(|r| r.record_type == "A");
 
@@ -113,13 +99,6 @@ pub async fn upsert_dns_record(params: &UpsertDnsParams) -> Result<()> {
         (
             reqwest::Method::PUT,
             format!("{}/{}", api_url, record.id),
-            serde_json::json!({
-                "type": "A",
-                "name": params.name,
-                "content": params.ip,
-                "ttl": 60, // 1 minute TTL for dynamic records
-                "proxied": false
-            }),
             UpdateDnsRecordBody {
                 record_type: "A",
                 name: &params.name,
@@ -134,14 +113,6 @@ pub async fn upsert_dns_record(params: &UpsertDnsParams) -> Result<()> {
         (
             reqwest::Method::POST,
             api_url,
-            serde_json::json!({
-                "type": "A",
-                "name": params.name,
-                "content": params.ip,
-                "ttl": 60,
-                "proxied": false
-            }),
-            api_url.to_string(),
             CreateDnsRecordBody {
                 record_type: "A",
                 name: &params.name,
@@ -152,21 +123,9 @@ pub async fn upsert_dns_record(params: &UpsertDnsParams) -> Result<()> {
         )
     };
 
-    let resp: CloudflareResponse<serde_json::Value> = client
-        .request(method, &url)
-        .bearer_auth(&token)
-        .json(&body)
-        .send()
-        .await?
-        .json()
-        .await?;
     // Execute the create or update request
     let _: CloudflareResponse<DnsRecord> =
         execute_request(&client, method, &url, Some(&body)).await?;
-
-    if !resp.success {
-        return Err(anyhow!("Cloudflare API error: {:?}", resp.errors));
-    }
 
     println!("✅ Successfully upserted DNS record for '{}'.", params.name);
     Ok(())
@@ -192,12 +151,12 @@ where
     }
 
     let response = request_builder.send().await.context("Failed to send request to Cloudflare API")?;
-    let status = response.status();
-    let resp_json = response.json::<CloudflareResponse<T>>().await.context("Failed to deserialize Cloudflare response")?;
+    let status = response.status(); // Keep status for error reporting
+    let resp_json: CloudflareResponse<T> = response.json().await.context("Failed to deserialize Cloudflare response")?;
 
     if !resp_json.success {
         return Err(anyhow!("Cloudflare API Error (Status: {}): {:?}", status, resp_json.errors));
     }
 
-    Ok(resp_json)
+    Ok(resp_json.result)
 }
