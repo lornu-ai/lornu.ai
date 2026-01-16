@@ -90,38 +90,38 @@ async function nukeSensitiveFiles(options: CleanupOptions): Promise<string[]> {
 
   console.log("🔍 Scanning for sensitive files...\n");
 
-  for (const pattern of SENSITIVE_PATTERNS) {
-    const glob = new Glob(pattern);
+  // Combine all patterns into a single glob scan for efficiency
+  const combinedPattern = `{${SENSITIVE_PATTERNS.join(",")}}`;
+  const glob = new Glob(combinedPattern);
 
-    for await (const file of glob.scan({ cwd: baseDir, absolute: true })) {
-      // Skip excluded directories
-      if (isExcluded(file)) {
-        if (verbose) {
-          console.log(`  ⏭️  Skipping (excluded): ${file}`);
-        }
-        continue;
+  for await (const file of glob.scan({ cwd: baseDir, absolute: true })) {
+    // Skip excluded directories
+    if (isExcluded(file)) {
+      if (verbose) {
+        console.log(`  ⏭️  Skipping (excluded): ${file}`);
       }
+      continue;
+    }
 
-      // Check if file exists (glob might return stale results)
-      if (!existsSync(file)) {
-        continue;
-      }
+    // Check if file exists (glob might return stale results)
+    if (!existsSync(file)) {
+      continue;
+    }
 
-      if (dryRun) {
-        console.log(`  🔸 Would delete: ${file}`);
+    if (dryRun) {
+      console.log(`  🔸 Would delete: ${file}`);
+      nukedFiles.push(file);
+    } else {
+      try {
+        // Secure wipe before deletion
+        await secureWipe(file);
+
+        // Delete the file
+        await unlink(file);
+        console.log(`  🧨 Nuked: ${file}`);
         nukedFiles.push(file);
-      } else {
-        try {
-          // Secure wipe before deletion
-          await secureWipe(file);
-
-          // Delete the file
-          await unlink(file);
-          console.log(`  🧨 Nuked: ${file}`);
-          nukedFiles.push(file);
-        } catch (error) {
-          console.error(`  ❌ Failed to delete ${file}: ${error}`);
-        }
+      } catch (error) {
+        console.error(`  ❌ Failed to delete ${file}: ${error}`);
       }
     }
   }

@@ -114,14 +114,22 @@ impl Drop for TempFileGuard {
             // Attempt secure wipe if enabled
             if self.secure_wipe {
                 if let Err(e) = self.secure_overwrite() {
-                    warn!("Failed to securely overwrite {:?}: {}", self.path, e);
+                    warn!(
+                        path = ?self.path,
+                        error = %e,
+                        "Failed to securely overwrite temporary file"
+                    );
                 }
             }
 
             // Delete the file
             match fs::remove_file(&self.path) {
-                Ok(_) => info!("Securely wiped: {:?}", self.path),
-                Err(e) => warn!("Failed to delete {:?}: {}", self.path, e),
+                Ok(_) => info!(path = ?self.path, "Securely wiped and deleted temporary file"),
+                Err(e) => warn!(
+                    path = ?self.path,
+                    error = %e,
+                    "Failed to delete temporary file"
+                ),
             }
         }
     }
