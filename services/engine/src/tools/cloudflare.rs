@@ -21,6 +21,7 @@ use tracing::{info, warn};
 ///
 /// This tool allows agents to manage DNS records without exposing API tokens.
 /// Credentials are fetched at runtime from Google Secret Manager using ADC.
+#[derive(Debug)]
 pub struct CloudflareTool {
     /// GCP project ID (injected at runtime via LORNU_GCP_PROJECT)
     project_id: String,

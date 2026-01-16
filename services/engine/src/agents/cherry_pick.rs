@@ -569,7 +569,7 @@ impl CherryPickAgent {
         let embedding = self.generate_embedding(conflict_signature).await?;
 
         // Create payload
-        let mut payload = HashMap::new();
+        let mut payload: HashMap<String, qdrant_client::qdrant::Value> = HashMap::new();
         payload.insert("id".to_string(), id.to_string().into());
         payload.insert(
             "conflict_signature".to_string(),
