@@ -1,0 +1,71 @@
+
+  // Apply infrastructure changes
+  console.log("🏗️  Applying infrastructure changes...");
+  const infraApply = bunInstalled
+    .withServiceBinding("surrealdb", surrealDb) // Make DB available to this step
+    .withEnvVariables(dbEnv)
+    .withExec(["bun", "run", "infra:apply"]);
+
+  // Build Bun release artifact
+  console.log("📦 Building Bun release artifact...");
+  const bunRelease = bunInstalled
+    .withServiceBinding("surrealdb", surrealDb) // Also available for frontend build if needed
+    .withEnvVariables(dbEnv)
+
+
+  // Apply infrastructure changes
+  console.log("🏗️  Applying infrastructure changes...");
+  const infraApply = bunInstalled
+    .withServiceBinding("surrealdb", surrealDb) // Make DB available to this step
+    .withEnvVariables(dbEnv)
+    .withExec(["bun", "run", "infra:apply"]);
+
+  // Build Bun release artifact
+  console.log("📦 Building Bun release artifact...");
+  const bunRelease = bunInstalled
+    .withServiceBinding("surrealdb", surrealDb) // Also available for frontend build if needed
+    .withEnvVariables(dbEnv)
+
+graph TD
+    subgraph User Interaction
+        UI[Web UI / CLI] -->|1. POST /api/v1/goals| API
+    end
+
+    subgraph "Orchestrator Core (New Rust Service)"
+        API[API Server]
+        Planner[AI Planner]
+        StateDB[(PostgreSQL)]
+
+        API --> Planner
+        Planner --> StateDB
+        Planner -->|2. Publish Task| MsgBus
+        StateDB <--> API
+    end
+
+    subgraph "Communication Bus (e.g., NATS)"
+        MsgBus(Message Bus)
+    end
+
+    subgraph "Agent Sandboxes (Knative Services)"
+        subgraph "Researcher Agent"
+            AgentRuntime1[Agent Runtime] -->|4. Execute Tool| Tool1[Web Search Tool]
+        end
+        subgraph "Writer Agent"
+            AgentRuntime2[Agent Runtime] -->|4. Execute Tool| Tool2[File Write Tool]
+        end
+    end
+    
+    subgraph "Shared Services"
+        ArtifactStore[(Object Storage)]
+    end
+
+    MsgBus -->|3. Consume Task| AgentRuntime1
+    MsgBus -->|3. Consume Task| AgentRuntime2
+    
+    AgentRuntime1 -->|5. Store/Read Artifacts| ArtifactStore
+    AgentRuntime2 -->|5. Store/Read Artifacts| ArtifactStore
+
+    AgentRuntime1 -->|6. Report Result| MsgBus
+    AgentRuntime2 -->|6. Report Result| MsgBus
+    MsgBus -->|7. Update Status| Planner
+

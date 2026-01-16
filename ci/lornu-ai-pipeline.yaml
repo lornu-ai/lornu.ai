@@ -1,0 +1,49 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: lornu-ai-ci
+spec:
+  description: |
+    CI pipeline for the lornu.ai repository.
+    Clones the repo and runs the Dagger pipeline.
+  params:
+    - name: repo-url
+      type: string
+      description: The git repository URL.
+    - name: branch-name
+      type: string
+      description: The git branch to checkout.
+    - name: event-type
+      type: string
+      description: The git event type (push, pull_request, merge).
+      default: "push"
+  workspaces:
+    - name: shared-data
+      description: Workspace for source code.
+  tasks:
+    - name: fetch-source
+      taskRef:
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: shared-data
+      params:
+        - name: url
+          value: $(params.repo-url)
+        - name: revision
+          value: $(params.branch-name)
+        - name: depth
+          value: "0" # Fetch all history for accurate branch info
+
+    - name: run-dagger-pipeline
+      runAfter: [ "fetch-source" ]
+      taskRef:
+        name: dagger-pipeline
+      workspaces:
+        - name: source
+          workspace: shared-data
+      params:
+        - name: branch
+          value: $(params.branch-name)
+        - name: event
+          value: $(params.event-type)

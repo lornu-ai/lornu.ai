@@ -11,6 +11,7 @@
 
 import { dag, Container, Directory } from "@dagger.io/dagger";
 import { parseArgs } from "util";
+import { versions } from "./versions";
 
 interface PipelineConfig {
   branch: string;
@@ -29,9 +30,18 @@ const args = parseArgs({
       description: "Git event type (push, pull_request, merge)",
       default: "push",
     },
+    "github-event-name": {
+      type: "string",
+      description: "The raw GitHub event name (e.g., 'push', 'pull_request')",
+    },
     "base-branch": {
       type: "string",
       description: "Base branch for PR (for pull_request events)",
+    },
+    source: {
+      type: "string",
+      description: "Path to the source code directory",
+      default: ".",
     },
     help: {
       type: "boolean",
@@ -51,7 +61,9 @@ Usage:
 Options:
   --branch <name>        Git branch name
   --event <type>         Event type: push, pull_request, merge (default: push)
+  --github-event-name <name> Raw GitHub event name
   --base-branch <name>   Base branch for PR (for pull_request events)
+  --source <path>        Path to source code (default: .)
   --help, -h             Show this help message
 
 Examples:
@@ -87,14 +99,22 @@ async function runFeatPipeline(source: Directory): Promise<void> {
   // Use alpine-based Bun image and add Rust
   const baseContainer = dag
     .container()
-    .from("oven/bun:alpine")
-    .withExec(["apk", "add", "--no-cache", "rust", "cargo", "bash"]);
+    .from(versions.images.bun)
+    .withExec(["apk", "add", "--no-cache", "rust", "cargo", "bash", "just"]);
 
   // Install dependencies first
   console.log("📦 Installing dependencies...");
   const install = baseContainer
     .withMountedDirectory("/src", source)
     .withWorkdir("/src")
+    // Mount cache for bun dependencies
+    .withMountedCache("/root/.bun/install/cache", dag.cacheVolume("bun-cache"))
+    // Mount cache for cargo dependencies
+    .withMountedCache(
+      "/usr/local/cargo/registry",
+      dag.cacheVolume("cargo-registry")
+    )
+    .withMountedCache("/src/target", dag.cacheVolume("cargo-target-feat"))
     .withExec(["bun", "install"]);
 
   try {
@@ -106,11 +126,8 @@ async function runFeatPipeline(source: Directory): Promise<void> {
 
   // Run baseline checks using Justfile
   // The Justfile already handles conditional checks (Rust/Bun/contracts)
-  console.log("🔍 Running baseline checks (just check)...");
-  const checks = baseContainer
-    .withMountedDirectory("/src", source)
-    .withWorkdir("/src")
-    .withExec(["apk", "add", "--no-cache", "just"])
+  console.log("🔍 Running baseline checks (just check)..."); // Use the install container which has deps
+  const checks = install
     .withExec(["just", "check"]);
 
   try {
@@ -135,10 +152,14 @@ async function runInfraPipeline(source: Directory): Promise<void> {
   console.log("📋 Running infrastructure dry-run...");
   const infraPlan = dag
     .container()
-    .from("oven/bun:latest")
+    .from(versions.images.bun)
     .withMountedDirectory("/src", source)
     .withWorkdir("/src")
+    .withMountedCache("/root/.bun/install/cache", dag.cacheVolume("bun-cache"))
     .withExec(["bun", "install"])
+    // We can't easily cache the infra:plan output itself, but we can cache the setup.
+    // This assumes infra:plan doesn't write to a cacheable directory that we want to persist.
+    // If it does, we could mount another cache volume.
     .withExec(["bun", "run", "infra:plan"]);
 
   const planOutput = await infraPlan.stdout();
@@ -161,9 +182,10 @@ async function runAgentPipeline(source: Directory, branch: string): Promise<void
   // Create sandbox namespace via Crossplane (this would call your infra script)
   const sandboxCreate = dag
     .container()
-    .from("oven/bun:latest")
+    .from(versions.images.bun)
     .withMountedDirectory("/src", source)
     .withWorkdir("/src")
+    .withMountedCache("/root/.bun/install/cache", dag.cacheVolume("bun-cache"))
     .withExec(["bun", "install"])
     .withExec([
       "bun",
@@ -177,25 +199,44 @@ async function runAgentPipeline(source: Directory, branch: string): Promise<void
 
   await sandboxCreate.stdout();
 
-  // Build and deploy agent to sandbox
-  console.log("📦 Building agent...");
-  const agentBuild = dag
+  // Build a minimal agent image using Nixpacks
+  console.log(`📦 Building agent image for '${agentName}' with Nixpacks...`);
+  const nixpacks = dag
     .container()
-    .from("rust:1.75-slim")
+    .from("ghcr.io/railwayapp/nixpacks:1.20.0") // Use the official Nixpacks image
     .withMountedDirectory("/src", source)
     .withWorkdir("/src")
-    .withExec(["cargo", "build", "--release", "--bin", agentName]);
+    .withExec([
+      "nixpacks",
+      "build",
+      ".", // Source directory
+      "--name",
+      `lornu-agent-${agentName}`, // Image name
+      "--tag",
+      "latest",
+    ]);
 
-  await agentBuild.stdout();
+  const agentImageRef = await nixpacks.stdout();
 
   // Deploy to Knative service in sandbox
   console.log("🚀 Deploying to Knative sandbox...");
   const deploy = dag
     .container()
-    .from("oven/bun:latest")
+    .from(versions.images.bun)
     .withMountedDirectory("/src", source)
     .withWorkdir("/src")
-    .withExec(["bun", "run", "infra:agent:deploy", "--name", agentName, "--sandbox", sandboxName]);
+    .withMountedCache("/root/.bun/install/cache", dag.cacheVolume("bun-cache"))
+    .withExec([
+      "bun",
+      "run",
+      "infra:agent:deploy",
+      "--name",
+      agentName,
+      "--sandbox",
+      sandboxName,
+      "--image",
+      agentImageRef.trim(), // Pass the newly built image reference to the deploy script
+    ]);
 
   await deploy.stdout();
 
@@ -208,40 +249,60 @@ async function runTrunkPipeline(source: Directory): Promise<void> {
   console.log("🚀 Trunk (`ta`) Pipeline: Apply + Release Build");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
+  // Setup a single container with bun dependencies installed
+  console.log("📦 Installing bun dependencies...");
+  const bunInstalled = dag
+    .container()
+    .from(versions.images.bun)
+    .withMountedDirectory("/src", source)
+    .withWorkdir("/src")
+    .withMountedCache("/root/.bun/install/cache", dag.cacheVolume("bun-cache"))
+    .withExec(["bun", "install"]);
+
   // Apply infrastructure changes
   console.log("🏗️  Applying infrastructure changes...");
-  const infraApply = dag
-    .container()
-    .from("oven/bun:latest")
-    .withMountedDirectory("/src", source)
-    .withWorkdir("/src")
-    .withExec(["bun", "install"])
-    .withExec(["bun", "run", "infra:apply"]);
+  const infraApply = bunInstalled.withExec(["bun", "run", "infra:apply"]);
 
-  await infraApply.stdout();
-
-  // Build release artifacts
-  console.log("📦 Building release artifacts...");
+  // Build Bun release artifact
+  console.log("📦 Building Bun release artifact...");
+  const bunRelease = bunInstalled.withExec(["bun", "run", "build"]);
+  
+  // Build the Rust orchestrator-engine service
+  console.log("📦 Building Rust orchestrator-engine service...");
   const rustRelease = dag
     .container()
-    .from("rust:1.75-slim")
+    .from(versions.images.rust)
     .withMountedDirectory("/src", source)
-    .withWorkdir("/src")
+    .withWorkdir("/src/services/engine") // Change to the service directory
+    .withMountedCache(
+      "/usr/local/cargo/registry",
+      dag.cacheVolume("cargo-registry")
+    )
+    // Use a specific cache volume for this service
+    .withMountedCache("/src/services/engine/target", dag.cacheVolume("cargo-target-engine"))
     .withExec(["cargo", "build", "--release"]);
 
-  await rustRelease.stdout();
-
-  const bunRelease = dag
-    .container()
-    .from("oven/bun:latest")
-    .withMountedDirectory("/src", source)
-    .withWorkdir("/src")
-    .withExec(["bun", "install"])
-    .withExec(["bun", "run", "build"]);
-
-  await bunRelease.stdout();
+  // Wait for all concurrent steps to complete
+  await Promise.all([
+    infraApply.stdout(),
+    bunRelease.stdout(),
+    rustRelease.stdout(),
+  ]);
 
   console.log("✅ Trunk pipeline completed! Ready for deployment.");
+}
+
+function getPipelineEvent(
+  branch: string,
+  githubEventName?: string
+): "push" | "pull_request" | "merge" {
+  if (githubEventName === "push" && branch === "ta") {
+    return "merge";
+  }
+  if (githubEventName === "pull_request") {
+    return "pull_request";
+  }
+  return "push";
 }
 
 async function main() {
@@ -254,7 +315,10 @@ async function main() {
   }
 
   const branch = values.branch;
-  const event = (values.event as "push" | "pull_request" | "merge") || "push";
+  const event = getPipelineEvent(
+    branch,
+    values["github-event-name"] as string | undefined
+  );
   const pattern = getBranchPattern(branch);
 
   console.log(`\n🔍 Branch: ${branch}`);
@@ -263,11 +327,15 @@ async function main() {
 
   // Connect to Dagger (disable telemetry to avoid OpenTelemetry dependency issues)
   const client = await dag.connect({
+    // In Tekton, the Dagger engine runs as a sidecar.
+    // The DOCKER_HOST env var is automatically set by the environment
+    // to point to the sidecar's Docker daemon.
+    // Locally, this will be undefined and Dagger will connect as usual.
     logOutput: process.stdout,
   });
 
   // Get source code
-  const source = client.host().directory(".", {
+  const source = client.host().directory(values.source as string, {
     exclude: [
       "**/node_modules/**",
       "**/target/**",

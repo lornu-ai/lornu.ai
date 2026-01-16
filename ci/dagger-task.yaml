@@ -1,0 +1,38 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: dagger-pipeline
+spec:
+  description: >-
+    Runs the lornu.ai Dagger pipeline based on the git branch and event type.
+  params:
+    - name: branch
+      description: The git branch name.
+      type: string
+    - name: event
+      description: The git event type (push, pull_request, merge).
+      type: string
+      default: "push"
+  workspaces:
+    - name: source
+      description: The workspace containing the source code.
+  steps:
+    - name: run-dagger-pipeline
+      # It's best practice to use a custom CI image with tools pre-installed.
+      # For now, we will install Dagger on the fly, but this should be improved.
+      image: oven/bun:1.0-alpine
+      workingDir: $(workspaces.source.path)
+      script: |
+        #!/usr/bin/env sh
+        set -e
+
+        echo "Running Dagger pipeline for branch: $(params.branch)"
+        dagger run bun ci/dagger.ts --branch "$(params.branch)" --event "$(params.event)" --source .
+  sidecars:
+    - name: dagger-engine
+      image: docker:dind
+      securityContext:
+        privileged: true
+      env:
+        - name: DOCKER_TLS_CERTDIR
+          value: "" # Disable TLS for local communication
