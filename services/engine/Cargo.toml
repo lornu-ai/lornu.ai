@@ -41,6 +41,9 @@ uuid = { version = "1.6", features = ["v4", "serde"] }
 futures = "0.3"
 async-trait = "0.1"
 
+# URL encoding for API calls
+urlencoding = "2.1"
+
 # Google Cloud SDK for Secret Manager (ADC-based auth)
 gcloud-sdk = { version = "0.25", features = ["google-cloud-secretmanager-v1"] }
 
