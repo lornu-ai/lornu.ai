@@ -15,7 +15,7 @@ use anyhow::{Context, Result};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::env;
-use tracing::{info, warn};
+use tracing::info;
 
 /// Cloudflare DNS management tool with secure credential handling.
 ///

@@ -10,8 +10,8 @@ use tracing::{info, warn, error};
 
 use super::providers::MultiCloudProviders;
 use super::types::{
-    CloudEndpoint, DnsSyncResult, HealthCheckConfig, LoadBalancerPool, 
-    MultiCloudConfig, PoolOrigin,
+    DnsSyncResult, LoadBalancerPool, 
+    MultiCloudConfig,
 };
 
 /// Multi-Cloud DNS Sync Agent
@@ -412,7 +412,7 @@ impl MultiCloudDnsSyncAgent {
             // Update existing pool
             info!("Updating existing pool: {}", existing.id);
             self.http_client
-                .put(&format!("{}/{}", base_url, existing.id))
+                .put(format!("{}/{}", base_url, existing.id))
                 .bearer_auth(token)
                 .json(&pool_config)
                 .send()

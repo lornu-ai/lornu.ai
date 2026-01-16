@@ -21,16 +21,13 @@ pub struct GitHubTeamTool {
 /// Team member role
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum TeamRole {
+    #[default]
     Member,
     Maintainer,
 }
 
-impl Default for TeamRole {
-    fn default() -> Self {
-        Self::Member
-    }
-}
 
 /// Result of a team operation
 #[derive(Debug, Serialize)]

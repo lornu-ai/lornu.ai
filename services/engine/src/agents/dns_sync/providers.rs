@@ -113,7 +113,7 @@ impl CloudProviderAdapter for AwsProvider {
         Ok(endpoints)
     }
 
-    async fn check_health(&self, endpoint: &CloudEndpoint) -> Result<HealthStatus> {
+    async fn check_health(&self, _endpoint: &CloudEndpoint) -> Result<HealthStatus> {
         // Query AWS ALB target group health via Crossplane status
         // For now, return Unknown and let Cloudflare health checks determine actual status
         Ok(HealthStatus::Unknown)
@@ -216,7 +216,7 @@ impl CloudProviderAdapter for AzureProvider {
         Ok(endpoints)
     }
 
-    async fn check_health(&self, endpoint: &CloudEndpoint) -> Result<HealthStatus> {
+    async fn check_health(&self, _endpoint: &CloudEndpoint) -> Result<HealthStatus> {
         Ok(HealthStatus::Unknown)
     }
 }
@@ -309,7 +309,7 @@ impl CloudProviderAdapter for GcpProvider {
         Ok(endpoints)
     }
 
-    async fn check_health(&self, endpoint: &CloudEndpoint) -> Result<HealthStatus> {
+    async fn check_health(&self, _endpoint: &CloudEndpoint) -> Result<HealthStatus> {
         Ok(HealthStatus::Unknown)
     }
 }

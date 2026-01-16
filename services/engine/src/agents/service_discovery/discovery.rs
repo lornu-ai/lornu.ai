@@ -7,9 +7,9 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{info, warn};
+use tracing::info;
 
-use super::identity::{CloudCredentials, FederatedIdentityManager, IdentityProvider};
+use super::identity::{CloudCredentials, FederatedIdentityManager};
 
 /// Discovered service endpoint
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -182,7 +182,7 @@ impl CloudDiscovery for GcpDiscovery {
                         for secret in secrets {
                             if let Some(name) = secret["name"].as_str() {
                                 services.push(ServiceEndpoint {
-                                    name: name.split('/').last().unwrap_or(name).to_string(),
+                                    name: name.split('/').next_back().unwrap_or(name).to_string(),
                                     provider: "gcp".to_string(),
                                     address: name.to_string(),
                                     service_type: "secret".to_string(),
@@ -500,10 +500,10 @@ impl MultiCloudDiscovery {
         cloudflare_zone: Option<&str>,
     ) -> Result<Self> {
         Ok(Self {
-            gcp: gcp_project.map(|p| GcpDiscovery::new(p)).transpose()?,
-            aws: aws_region.map(|r| AwsDiscovery::new(r)).transpose()?,
-            azure: azure_subscription.map(|s| AzureDiscovery::new(s)).transpose()?,
-            cloudflare: cloudflare_zone.map(|z| CloudflareDiscovery::new(z)).transpose()?,
+            gcp: gcp_project.map(GcpDiscovery::new).transpose()?,
+            aws: aws_region.map(AwsDiscovery::new).transpose()?,
+            azure: azure_subscription.map(AzureDiscovery::new).transpose()?,
+            cloudflare: cloudflare_zone.map(CloudflareDiscovery::new).transpose()?,
             identity_manager: FederatedIdentityManager::new()?,
         })
     }

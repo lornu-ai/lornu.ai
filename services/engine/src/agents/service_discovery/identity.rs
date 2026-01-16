@@ -4,10 +4,10 @@
 //! ServiceAccounts to assume native cloud identities without static keys.
 
 use anyhow::{Context, Result};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::env;
 use std::time::{Duration, Instant};
-use tracing::{info, warn};
+use tracing::info;
 
 /// Cloud identity credentials with automatic refresh
 #[derive(Debug, Clone)]

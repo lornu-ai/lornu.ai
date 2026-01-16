@@ -8,11 +8,8 @@ use serde::{Deserialize, Serialize};
 use std::time::Instant;
 use tracing::{info, warn, error};
 
-use super::discovery::{
-    CloudflareDiscovery, GcpDiscovery, HealthStatus, MultiCloudDiscovery,
-};
+use super::discovery::MultiCloudDiscovery;
 use super::experience::ExperienceStore;
-use super::identity::CloudCredentials;
 
 /// Remediation action taken by the reconciler
 #[derive(Debug, Clone, Serialize, Deserialize)]

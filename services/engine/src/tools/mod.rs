@@ -7,4 +7,3 @@ pub mod cloudflare;
 pub mod github;
 
 pub use cloudflare::CloudflareTool;
-pub use github::GitHubTeamTool;

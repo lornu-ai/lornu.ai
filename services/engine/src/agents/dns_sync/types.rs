@@ -217,8 +217,10 @@ impl Default for HealthCheckConfig {
 /// Failover strategy for multi-cloud routing
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum FailoverStrategy {
     /// Route all traffic to highest priority healthy origin
+    #[default]
     Failover,
     /// Distribute traffic based on weights
     WeightedRoundRobin,
@@ -228,8 +230,3 @@ pub enum FailoverStrategy {
     LatencyBased,
 }
 
-impl Default for FailoverStrategy {
-    fn default() -> Self {
-        Self::Failover
-    }
-}

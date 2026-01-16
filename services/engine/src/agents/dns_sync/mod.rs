@@ -19,6 +19,4 @@ mod types;
 mod providers;
 mod orchestrator;
 
-pub use types::*;
-pub use providers::*;
 pub use orchestrator::MultiCloudDnsSyncAgent;

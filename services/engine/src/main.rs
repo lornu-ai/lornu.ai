@@ -11,7 +11,6 @@ use axum::{
 };
 use clap::{Parser, Subcommand};
 use std::net::SocketAddr;
-use std::path::PathBuf;
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 use tracing::{info, warn, Level};
