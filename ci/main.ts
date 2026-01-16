@@ -44,15 +44,15 @@ async function pipeline() {
 
     const engineBuild = rustBuilder
       .withWorkdir('/src/services/engine')
-      .withExec(['cargo', 'build', '--release']);
+      .withExec(['cargo', 'build', '--release', '--locked']);
 
     const gatewayBuild = rustBuilder
       .withWorkdir('/src/services/gateway')
-      .withExec(['cargo', 'build', '--release']);
+      .withExec(['cargo', 'build', '--release', '--locked']);
 
     const workerBuild = rustBuilder
       .withWorkdir('/src/services/agent-worker')
-      .withExec(['cargo', 'build', '--release']);
+      .withExec(['cargo', 'build', '--release', '--locked']);
 
     // =========================================
     // Stage 2: Infrastructure (Crossplane)
