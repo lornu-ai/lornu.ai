@@ -9,6 +9,12 @@ steps:
         cd services/engine
         cargo build --release --bin dns-sync-agent
         cp target/release/dns-sync-agent /workspace/dns-sync-agent
+        # Create minimal Dockerfile
+        cat > /workspace/Dockerfile.runtime <<'DOCKERFILE'
+        FROM gcr.io/distroless/cc-debian12
+        COPY dns-sync-agent /dns-sync-agent
+        ENTRYPOINT ["/dns-sync-agent"]
+        DOCKERFILE
     dir: '.'
 
   # Build minimal Docker image
@@ -17,19 +23,12 @@ steps:
       - 'build'
       - '-t'
       - 'us-central1-docker.pkg.dev/$PROJECT_ID/lornu-ai/dns-sync-agent:latest'
-      - '-t'
-      - 'us-central1-docker.pkg.dev/$PROJECT_ID/lornu-ai/dns-sync-agent:$SHORT_SHA'
       - '-f'
-      - '-'
+      - 'Dockerfile.runtime'
       - '.'
-    stdin: |
-      FROM gcr.io/distroless/cc-debian12
-      COPY dns-sync-agent /dns-sync-agent
-      ENTRYPOINT ["/dns-sync-agent"]
 
 images:
   - 'us-central1-docker.pkg.dev/$PROJECT_ID/lornu-ai/dns-sync-agent:latest'
-  - 'us-central1-docker.pkg.dev/$PROJECT_ID/lornu-ai/dns-sync-agent:$SHORT_SHA'
 
 timeout: 1200s
 options:
