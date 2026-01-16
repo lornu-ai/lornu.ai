@@ -31,6 +31,8 @@ use qdrant_client::Qdrant;
 use reqwest::Client;
 use serde_json::json;
 use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::Semaphore;
 use tracing::{info, warn};
 use uuid::Uuid;
 
@@ -65,6 +67,8 @@ pub struct ZeroTrustAgent {
     inactivity_days: u32,
     /// Secret age threshold in days
     secret_age_days: u32,
+    /// Rate limiter for GCP API calls (max 10 concurrent requests)
+    rate_limiter: Arc<Semaphore>,
 }
 
 impl ZeroTrustAgent {
@@ -104,6 +108,7 @@ impl ZeroTrustAgent {
             openai_client,
             inactivity_days: DEFAULT_INACTIVITY_DAYS,
             secret_age_days: DEFAULT_SECRET_AGE_DAYS,
+            rate_limiter: Arc::new(Semaphore::new(10)), // Max 10 concurrent GCP API calls
         };
 
         agent.ensure_collection().await?;
@@ -240,6 +245,9 @@ impl ZeroTrustAgent {
 
     /// List all service accounts in the project
     async fn list_service_accounts(&self) -> Result<Vec<serde_json::Value>> {
+        // Acquire rate limiter permit before making GCP API call
+        let _permit = self.rate_limiter.acquire().await.unwrap();
+        
         let token = self.get_access_token().await?;
         let url = format!(
             "https://iam.googleapis.com/v1/projects/{}/serviceAccounts",
@@ -269,6 +277,9 @@ impl ZeroTrustAgent {
 
     /// Get IAM insights from Recommender API
     async fn get_iam_insights(&self) -> Result<Vec<IamInsight>> {
+        // Acquire rate limiter permit before making GCP API call
+        let _permit = self.rate_limiter.acquire().await.unwrap();
+        
         let token = self.get_access_token().await?;
 
         // Query IAM policy insights
@@ -347,6 +358,9 @@ impl ZeroTrustAgent {
 
     /// Scan for stale secrets in Secret Manager
     async fn scan_stale_secrets(&self) -> Result<Vec<SecretRotationRequest>> {
+        // Acquire rate limiter permit before making GCP API call
+        let _permit = self.rate_limiter.acquire().await.unwrap();
+        
         let token = self.get_access_token().await?;
         let url = format!(
             "https://secretmanager.googleapis.com/v1/projects/{}/secrets",
@@ -731,6 +745,7 @@ mod tests {
             openai_client: OpenAIClient::new(),
             inactivity_days: 90,
             secret_age_days: 90,
+            rate_limiter: Arc::new(Semaphore::new(10)),
         };
 
         // Test low severity (5 or fewer unused permissions)
