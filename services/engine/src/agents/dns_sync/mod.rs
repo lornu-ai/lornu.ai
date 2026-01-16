@@ -21,6 +21,9 @@ mod orchestrator;
 pub mod cloudflare;
 pub mod cloudflare_permissions;
 
+#[allow(unused_imports)]
 pub use orchestrator::MultiCloudDnsSyncAgent;
+#[allow(unused_imports)]
 pub use cloudflare::{CloudflareDnsClient, DnsRecordType, DnsRecordSyncResult, IngressDnsMapping};
+#[allow(unused_imports)]
 pub use cloudflare_permissions::{CloudflareConfig, TokenPolicy, permission_groups};

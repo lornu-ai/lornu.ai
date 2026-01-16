@@ -27,7 +27,7 @@ pub trait CloudProviderAdapter: Send + Sync {
 /// AWS Provider - discovers ALB/NLB endpoints via Crossplane
 pub struct AwsProvider {
     k8s_client: Client,
-    namespace: String,
+    _namespace: String,
 }
 
 impl AwsProvider {
@@ -38,7 +38,7 @@ impl AwsProvider {
 
         Ok(Self {
             k8s_client,
-            namespace: namespace.to_string(),
+            _namespace: namespace.to_string(),
         })
     }
 
@@ -51,7 +51,7 @@ impl AwsProvider {
     ) -> Result<Vec<T>> {
         let api: Api<kube::core::DynamicObject> = Api::namespaced_with(
             self.k8s_client.clone(),
-            &self.namespace,
+            &self._namespace,
             &kube::discovery::ApiResource {
                 group: group.to_string(),
                 version: version.to_string(),
@@ -123,7 +123,7 @@ impl CloudProviderAdapter for AwsProvider {
 /// Azure Provider - discovers Front Door/Public IP endpoints via Crossplane
 pub struct AzureProvider {
     k8s_client: Client,
-    namespace: String,
+    _namespace: String,
 }
 
 impl AzureProvider {
@@ -134,7 +134,7 @@ impl AzureProvider {
 
         Ok(Self {
             k8s_client,
-            namespace: namespace.to_string(),
+            _namespace: namespace.to_string(),
         })
     }
 }
@@ -224,7 +224,7 @@ impl CloudProviderAdapter for AzureProvider {
 /// GCP Provider - discovers Global Load Balancer endpoints via Crossplane
 pub struct GcpProvider {
     k8s_client: Client,
-    namespace: String,
+    _namespace: String,
 }
 
 impl GcpProvider {
@@ -235,7 +235,7 @@ impl GcpProvider {
 
         Ok(Self {
             k8s_client,
-            namespace: namespace.to_string(),
+            _namespace: namespace.to_string(),
         })
     }
 }

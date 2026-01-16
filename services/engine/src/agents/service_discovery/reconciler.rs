@@ -240,10 +240,8 @@ impl CrossCloudReconciler {
                         "aws"
                     } else if value.contains("azurefd.net") {
                         "azure"
-                    } else if value.chars().next().map_or(false, |c| c.is_ascii_digit()) {
-                        "gcp" // GCP typically uses naked IPs for global LB
                     } else {
-                        "gcp" // Default fallthrough
+                        "gcp" // Default or GCP IP-based LB
                     }
                 }
                 Err(_) => "gcp",

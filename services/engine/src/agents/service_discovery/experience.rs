@@ -26,11 +26,13 @@ pub struct Experience {
 /// - Stores every incident and remediation outcome
 /// - Allows querying similar past incidents
 /// - Reinforces successful patterns
+#[allow(dead_code)]
 pub struct ExperienceStore {
     experiences: VecDeque<Experience>,
     max_size: usize,
 }
 
+#[allow(dead_code)]
 impl ExperienceStore {
     pub fn new() -> Self {
         Self::with_capacity(1000)

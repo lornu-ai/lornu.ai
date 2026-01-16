@@ -31,4 +31,5 @@ pub mod remediator;
 pub mod types;
 pub mod zero_trust;
 
+#[allow(unused_imports)]
 pub use zero_trust::ZeroTrustAgent;

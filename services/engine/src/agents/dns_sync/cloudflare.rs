@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use tracing::{info, warn, debug};
+use tracing::{info, debug};
 
 const CLOUDFLARE_API_BASE: &str = "https://api.cloudflare.com/client/v4";
 
@@ -15,8 +15,11 @@ const CLOUDFLARE_API_BASE: &str = "https://api.cloudflare.com/client/v4";
 #[serde(rename_all = "UPPERCASE")]
 pub enum DnsRecordType {
     A,
+    #[allow(clippy::upper_case_acronyms)]
     AAAA,
+    #[allow(clippy::upper_case_acronyms)]
     CNAME,
+    #[allow(clippy::upper_case_acronyms)]
     TXT,
     MX,
     NS,
@@ -72,7 +75,7 @@ struct CloudflareResponse<T> {
 
 #[derive(Debug, Deserialize)]
 struct CloudflareError {
-    code: i32,
+    _code: i32,
     message: String,
 }
 

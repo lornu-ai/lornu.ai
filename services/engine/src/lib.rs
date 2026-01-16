@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Lornu AI Engine Library
 //!
 //! Core orchestration engine with secure tool integrations.

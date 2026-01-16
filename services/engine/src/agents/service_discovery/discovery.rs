@@ -244,15 +244,15 @@ pub struct CertificateStatus {
 
 /// AWS Discovery - Secrets Manager, EKS Clusters
 pub struct AwsDiscovery {
-    http_client: reqwest::Client,
-    region: String,
+    _http_client: reqwest::Client,
+    _region: String,
 }
 
 impl AwsDiscovery {
     pub fn new(region: &str) -> Result<Self> {
         Ok(Self {
-            http_client: reqwest::Client::new(),
-            region: region.to_string(),
+            _http_client: reqwest::Client::new(),
+            _region: region.to_string(),
         })
     }
 }

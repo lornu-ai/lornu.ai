@@ -359,8 +359,7 @@ impl FederatedIdentityManager {
 }
 
 /// No longer used internally, replaced by quick-xml
-#[deprecated(note = "Use quick-xml for robust parsing")]
-fn _extract_xml_value(xml: &str, tag: &str) -> Option<String> {
+fn extract_xml_value(xml: &str, tag: &str) -> Option<String> {
     let start_tag = format!("<{}>", tag);
     let end_tag = format!("</{}>", tag);
 

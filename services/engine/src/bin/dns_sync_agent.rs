@@ -3,6 +3,7 @@
 //! Syncs K8s Ingress IPs to Cloudflare DNS records.
 //! Replaces the Python cloudflare-dns-agent with a high-performance Rust implementation.
 
+#![allow(dead_code)]
 use anyhow::{Context, Result};
 use base64::Engine;
 use clap::Parser;
@@ -14,7 +15,7 @@ use tokio::time::interval;
 use tracing::{info, warn, error, Level};
 use tracing_subscriber::FmtSubscriber;
 
-use lornu_engine::agents::dns_sync::{CloudflareDnsClient, DnsRecordType, IngressDnsMapping};
+use lornu_engine::agents::dns_sync::{CloudflareDnsClient, IngressDnsMapping};
 
 /// DNS Sync Agent - Syncs K8s Ingress IPs to Cloudflare DNS
 #[derive(Parser, Debug)]
@@ -44,7 +45,7 @@ struct Args {
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize logging
-    let subscriber = FmtSubscriber::builder()
+    FmtSubscriber::builder()
         .with_max_level(Level::INFO)
         .with_target(false)
         .json()

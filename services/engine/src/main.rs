@@ -3,6 +3,7 @@
 //! Core orchestration engine with secure tool integrations.
 //! Uses ADC (Application Default Credentials) - no secrets in code.
 
+#![allow(dead_code)]
 use anyhow::{Context, Result};
 use axum::{
     extract::State,
