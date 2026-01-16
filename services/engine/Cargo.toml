@@ -64,6 +64,9 @@ git2 = "0.18"
 # Chrono for timestamps
 chrono = { version = "0.4", features = ["serde"] }
 
+# CLI argument parsing
+clap = { version = "4.4", features = ["derive"] }
+
 # Pin transitive dependency to version compatible with Rust 1.85
 # (home 0.5.12 requires Rust 1.88)
 home = "=0.5.9"

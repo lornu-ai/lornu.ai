@@ -9,6 +9,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use clap::Parser;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
@@ -19,7 +20,24 @@ mod agents;
 mod tools;
 
 use agents::executor::CrossplaneExecutor;
+use agents::cyber::zero_trust::ZeroTrustAgent;
 use tools::CloudflareTool;
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Cli {
+    /// Task to run (e.g., 'cyber')
+    #[arg(long)]
+    task: Option<String>,
+
+    /// Sub-agent to run (e.g., 'zero-trust')
+    #[arg(long)]
+    sub_agent: Option<String>,
+
+    /// Mode of operation (e.g., 'audit', 'harden')
+    #[arg(long)]
+    mode: Option<String>,
+}
 
 #[derive(Clone)]
 struct AppState {
@@ -33,6 +51,33 @@ async fn main() -> Result<()> {
         .with_max_level(Level::INFO)
         .json()
         .init();
+
+    let cli = Cli::parse();
+
+    if let Some(task) = cli.task {
+        if task == "cyber" {
+            if let Some(sub_agent) = cli.sub_agent {
+                if sub_agent == "zero-trust" {
+                    let mode = cli.mode.unwrap_or_else(|| "audit".to_string());
+                    info!("Running Zero Trust Agent in {} mode", mode);
+                    
+                    let agent = ZeroTrustAgent::new(90)?; 
+                    
+                    match mode.as_str() {
+                        "audit" | "harden" => {
+                            let corrections = agent.run_hardening_pass().await?;
+                            info!("Found {} corrections", corrections.len());
+                            for c in corrections {
+                                info!("Correction: {} -> {}", c.sa_email, c.new_role);
+                            }
+                        }
+                        _ => warn!("Unknown mode: {}", mode),
+                    }
+                    return Ok(());
+                }
+            }
+        }
+    }
 
     info!("Starting Lornu AI Engine");
 

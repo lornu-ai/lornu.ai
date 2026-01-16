@@ -9,9 +9,9 @@ set shell := ["bash", "-cu"]
 default:
     @just --list
 
-# ============================================
+# ============================================ 
 # Security (Run before commits!)
-# ============================================
+# ============================================ 
 
 # Scan for secrets before committing - REQUIRED
 scan-secrets:
@@ -27,9 +27,9 @@ scan-secrets:
         'gho_[a-zA-Z0-9]{36}'
         'glpat-[a-zA-Z0-9_-]{20}'
         'xox[baprs]-[a-zA-Z0-9-]+'
-        '"password":\s*"[^"]+'
-        '"api_key":\s*"[^"]+'
-        '"secret":\s*"[^"]+'
+        '"password":\s*"[^" ]+'
+        '"api_key":\s*"[^" ]+'
+        '"secret":\s*"[^" ]+'
     )
 
     FOUND=0
@@ -63,9 +63,9 @@ commit msg: scan-secrets
     git add .
     git commit -m "{{msg}}"
 
-# ============================================
+# ============================================ 
 # Development
-# ============================================
+# ============================================ 
 
 # Setup local development (ADC auth)
 setup:
@@ -85,9 +85,9 @@ dev-infra:
 dev-services:
     cd services && cargo build
 
-# ============================================
+# ============================================ 
 # Build
-# ============================================
+# ============================================ 
 
 # Build all components
 build: build-services build-infra
@@ -100,9 +100,9 @@ build-services:
 build-infra:
     cd infra && bun install && bun run synth
 
-# ============================================
+# ============================================ 
 # Test
-# ============================================
+# ============================================ 
 
 # Run all tests
 test: test-services scan-secrets
@@ -115,9 +115,9 @@ test-services:
 test-infra:
     cd infra && bun run validate
 
-# ============================================
+# ============================================ 
 # Lint & Format
-# ============================================
+# ============================================ 
 
 # Run all checks (for CI)
 # Note: Full checks require rust toolchain with clippy
@@ -137,9 +137,9 @@ fmt:
 fmt-check:
     cd services && cargo fmt -- --check
 
-# ============================================
+# ============================================ 
 # Infrastructure
-# ============================================
+# ============================================ 
 
 # Synthesize CDK8s manifests
 synth env="dev":
@@ -153,9 +153,9 @@ apply env="dev":
 apply-dry-run env="dev":
     cd infra && LORNU_ENV={{env}} bun run apply:dry-run
 
-# ============================================
+# ============================================ 
 # CI/CD
-# ============================================
+# ============================================ 
 
 # Run full CI pipeline via Dagger
 ci: scan-secrets
@@ -165,9 +165,9 @@ ci: scan-secrets
 ci-fast: scan-secrets
     dagger run bun ci/main.ts --skip-infra
 
-# ============================================
+# ============================================ 
 # Clean
-# ============================================
+# ============================================ 
 
 # Clean all build artifacts
 clean:
@@ -175,9 +175,9 @@ clean:
     rm -rf infra/cdk8s.out
     rm -rf infra/node_modules
 
-# ============================================
+# ============================================ 
 # Utilities
-# ============================================
+# ============================================ 
 
 # Check versions of all tools
 versions:
@@ -193,3 +193,15 @@ check-auth:
     @gcloud auth application-default print-access-token > /dev/null 2>&1 && \
         echo "ADC configured correctly" || \
         (echo "ERROR: Run 'gcloud auth application-default login' first" && exit 1)
+
+# ============================================ 
+# Cyber Security Agents
+# ============================================ 
+
+# Run a manual Zero-Trust audit pass
+zero-trust-audit:
+    cd services && cargo run -p lornu-engine -- --task cyber --sub-agent zero-trust --mode audit
+
+# Execute the hardening pass and generate PRs for any over-privileged accounts
+zero-trust-harden:
+    cd services && cargo run -p lornu-engine -- --task cyber --sub-agent zero-trust --mode harden
