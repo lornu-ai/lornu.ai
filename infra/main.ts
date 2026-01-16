@@ -1,5 +1,10 @@
 import { App, Chart, ChartProps, ApiObject } from "cdk8s";
 import { Construct } from "constructs";
+import {
+  AgentXRDs,
+  AgentCompositions,
+  ExampleClaims,
+} from "./src/constructs";
 
 // Environment configuration
 export type LornuEnv = "dev" | "staging" | "prod";
@@ -88,6 +93,29 @@ export class LornuInfra extends Chart {
         SYNTH_TIME: new Date().toISOString(),
       },
     });
+
+    // --------------------------------------------------------
+    // Crossplane XRDs (AgentMemory, AgentWorker)
+    // --------------------------------------------------------
+    new AgentXRDs(this, "agent-xrds", { env: this.env });
+
+    // --------------------------------------------------------
+    // Crossplane Compositions (GCP implementations)
+    // --------------------------------------------------------
+    new AgentCompositions(this, "agent-compositions", { env: this.env });
+
+    // --------------------------------------------------------
+    // Example Claims (for testing/demonstration)
+    // Only create in dev environment to avoid prod resource creation
+    // --------------------------------------------------------
+    if (this.env === "dev") {
+      const ns = `lornu-ai-${this.env}`;
+      new ExampleClaims(this, "example-claims", {
+        namespace: ns,
+        env: this.env,
+      });
+      console.log(`[Hub] Created example claims in ${ns}`);
+    }
 
     // TODO: Add Crossplane ProviderConfigs when CRDs are imported
     // Example:
