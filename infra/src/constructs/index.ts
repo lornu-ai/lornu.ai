@@ -14,3 +14,4 @@ export {
   AgentWorkerClaim,
   ExampleClaims,
 } from "./agent-claims";
+export { PreviewWorkload } from "./preview-workload";
