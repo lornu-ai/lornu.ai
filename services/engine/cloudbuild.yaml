@@ -6,7 +6,7 @@ steps:
       - '-c'
       - |
         apt-get update && apt-get install -y --no-install-recommends pkg-config libssl-dev ca-certificates && rm -rf /var/lib/apt/lists/*
-        cd services/engine
+        cd services
         cargo build --release --bin dns-sync-agent
         cp target/release/dns-sync-agent /workspace/dns-sync-agent
         # Create minimal Dockerfile
