@@ -1,13 +1,14 @@
-name: actions-placeholder
+name: Actions Placeholder
+
+# Minimal workflow to satisfy CodeQL's "actions" extractor.
+# Prevents CodeQL failure when no real YAML workflows exist in the repository.
 
 on:
   workflow_dispatch:
 
-permissions:
-  contents: read
-
 jobs:
-  noop:
+  placeholder:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "Placeholder workflow for CodeQL actions analyzer."
+      - name: Acknowledge
+        run: echo "CodeQL actions extractor satisfied."

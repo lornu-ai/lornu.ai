@@ -97,7 +97,7 @@ async function getInstallationIdFromSlug(
   const octokit = new Octokit({
     auth: jwt,
   });
-  
+
   try {
     // First, try to get installation by slug directly via REST API
     // GitHub API accepts slugs in the URL path
@@ -112,7 +112,7 @@ async function getInstallationIdFromSlug(
           },
         }
       );
-      
+
       if (response.ok) {
         const installation = await response.json();
         console.error(`✅ Found installation: ID=${installation.id}, Account=${installation.account?.login}`);
@@ -124,7 +124,7 @@ async function getInstallationIdFromSlug(
     } catch (e) {
       // Continue to list all installations
     }
-    
+
     // List all installations and find matching one
     let installations;
     try {
@@ -142,7 +142,7 @@ async function getInstallationIdFromSlug(
       }
       throw error;
     }
-    
+
     if (installations.length === 0) {
       throw new Error(
         "No installations found. Make sure:\n" +
@@ -151,25 +151,25 @@ async function getInstallationIdFromSlug(
         "  3. Install the app on 'lornu-ai/lornu.ai' repository"
       );
     }
-    
+
     console.error(`📋 Found ${installations.length} installation(s):`);
     for (const inst of installations) {
       console.error(`   - ID: ${inst.id}, Account: ${inst.account?.login || 'N/A'}, Repos: ${inst.repository_selection}`);
     }
-    
+
     // If only one installation, use it
     if (installations.length === 1) {
       console.error(`✅ Using the only installation: ID=${installations[0].id}`);
       return installations[0].id;
     }
-    
+
     // Try to match by account name if slug looks like it could be an account
     for (const installation of installations) {
       if (installation.account?.login === installationSlug) {
         return installation.id;
       }
     }
-    
+
     throw new Error(
       `Multiple installations found but couldn't match slug "${installationSlug}".\n` +
       `Please use the numeric Installation ID from the list above, or install the app on only one repository.`
@@ -200,7 +200,7 @@ async function getInstallationToken(
         },
       }
     );
-    
+
     if (response.ok) {
       const data = await response.json();
       return data.token;
@@ -217,7 +217,7 @@ async function getInstallationToken(
     }
     // Fall through to try resolving slug
   }
-  
+
   // If direct API call failed, try using Octokit with numeric ID resolution
   const octokit = new Octokit({
     auth: jwt,
@@ -226,7 +226,7 @@ async function getInstallationToken(
   try {
     // Check if installationId is numeric or a slug
     let installationIdNum: number;
-    
+
     if (/^\d+$/.test(installationId)) {
       // It's a numeric ID
       installationIdNum = parseInt(installationId, 10);
@@ -237,11 +237,11 @@ async function getInstallationToken(
       installationIdNum = await getInstallationIdFromSlug(jwt, installationId);
       console.error(`✅ Found numeric Installation ID: ${installationIdNum}`);
     }
-    
+
     const response = await octokit.apps.createInstallationAccessToken({
       installation_id: installationIdNum,
     });
-    
+
     return response.data.token;
   } catch (error: any) {
     if (error.status === 404 || error.message?.includes("not found")) {
@@ -265,7 +265,7 @@ async function main() {
     
     // Use stderr for log messages so stdout only contains the token
     const log = args.quiet ? () => {} : (msg: string) => console.error(msg);
-    
+
     // All log messages go to stderr so stdout only contains the token
     console.error("🔐 Generating JWT for GitHub App...");
     const jwt = generateJWT(args.appId, args.privateKey);

@@ -13,7 +13,7 @@
 ### ❓ Review: `develop`
 - **Status**: Has 1 unique commit not in `ta`
   - `feat(agents): add Cloudflare DNS agent in Rust`
-- **Recommendation**: 
+- **Recommendation**:
   - **If work needs to be merged**: Create PR from `develop` → `ta`, then delete `develop`
   - **If work is obsolete**: Delete `develop`
 - **Action**: Review the Cloudflare DNS agent work and decide
@@ -26,7 +26,7 @@
 
 ### ❌ Delete: `deploy`
 - **Status**: No unique commits vs `ta`
-- **Commits**: Same as `build` branch  
+- **Commits**: Same as `build` branch
 - **Recommendation**: **DELETE** - Obsolete, violates trunk-based workflow
 - **Action**: Delete after confirming no active work
 

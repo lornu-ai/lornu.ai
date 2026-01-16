@@ -8,10 +8,9 @@
  * - Claims: Example claims for testing and demonstration
  */
 
-export { AgentXRDs, AgentCompositions } from "./agent-xrds";
+export { AgentXRDs, AgentCompositions } from "./agent-xrds.js";
 export {
   AgentMemoryClaim,
   AgentWorkerClaim,
   ExampleClaims,
-} from "./agent-claims";
-export { PreviewWorkload } from "./preview-workload";
+} from "./agent-claims.js";

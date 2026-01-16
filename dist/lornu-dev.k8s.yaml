@@ -11,7 +11,7 @@ metadata:
 data:
   LORNU_ENV: dev
   MANAGED_BY: cdk8s-ssa
-  SYNTH_TIME: "2026-01-16T04:32:09.606Z"
+  SYNTH_TIME: "2026-01-16T13:59:28.740Z"
 ---
 apiVersion: apiextensions.crossplane.io/v1
 kind: CompositeResourceDefinition
@@ -320,11 +320,31 @@ spec:
   replicas: 3
   timeout: 30m
 ---
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  labels:
+    app.kubernetes.io/name: ai-agent-core
+    app.kubernetes.io/part-of: lornu-ai
+    lornu.ai/environment: dev
+    lornu.ai/eso-sync: "true"
+    lornu.ai/managed-by: crossplane
+  name: lornu-cluster-vars
+  namespace: ai-agent-core
+spec:
+  dataFrom:
+    - extract:
+        key: lornu/cluster-vars
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: cluster-secret-store-aws
+  target:
+    name: lornu-cluster-vars
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: ai-agent-core
     app.kubernetes.io/name: ai-agent-core
     app.kubernetes.io/part-of: lornu-ai
     lornu.ai/environment: dev
@@ -335,19 +355,20 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app: ai-agent-core
+      app.kubernetes.io/name: ai-agent-core
   template:
     metadata:
       labels:
-        app: ai-agent-core
+        app.kubernetes.io/name: ai-agent-core
+        app.kubernetes.io/part-of: lornu-ai
+        lornu.ai/environment: dev
+        lornu.ai/managed-by: crossplane
     spec:
       containers:
-        - env:
-            - name: LORNU_ENV
-              value: dev
-            - name: LORNU_GCP_PROJECT
-              value: lornu-v2
-          image: gcr.io/lornu-v2/ai-agent-core:latest
+        - envFrom:
+            - secretRef:
+                name: lornu-cluster-vars
+          image: us-central1-docker.pkg.dev/lornu-ai/lornu-ai/ai-agent-core:latest
           livenessProbe:
             httpGet:
               path: /health
@@ -365,11 +386,11 @@ spec:
             periodSeconds: 10
           resources:
             limits:
-              cpu: 1000m
-              memory: 1Gi
-            requests:
               cpu: 500m
               memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 256Mi
 ---
 apiVersion: v1
 kind: Service
@@ -382,7 +403,7 @@ spec:
       protocol: TCP
       targetPort: 8080
   selector:
-    app: ai-agent-core
+    app.kubernetes.io/name: ai-agent-core
   type: ClusterIP
 ---
 apiVersion: networking.k8s.io/v1

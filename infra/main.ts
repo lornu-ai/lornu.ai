@@ -6,8 +6,8 @@ import {
   AgentXRDs,
   AgentCompositions,
   ExampleClaims,
-  PreviewWorkload,
-} from "./src/constructs";
+} from "./src/constructs/index.js";
+
 // ============================================================
 // Core Infrastructure Chart (Unified)
 // ============================================================
@@ -79,12 +79,6 @@ export class LornuInfra extends Chart {
     const projectId = process.env.GCP_PROJECT_ID || "lornu-ai";
 
     if (this.env === "dev") {
-      // Deploy the main preview engine in dev environment
-      new PreviewWorkload(this, "preview-engine", {
-        image: "gcr.io/lornu-v2/ai-agent-core:latest",
-      });
-      console.log(`[Spoke] Created preview workload for ${this.env}`);
-
       // Fix for Issue #95 - Deploy AiAgentCore with resolving image name
       new AiAgentCore(this, "ai-agent-core", {
         projectId: projectId,

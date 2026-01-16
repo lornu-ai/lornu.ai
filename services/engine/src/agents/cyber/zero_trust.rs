@@ -247,7 +247,7 @@ impl ZeroTrustAgent {
     async fn list_service_accounts(&self) -> Result<Vec<serde_json::Value>> {
         // Acquire rate limiter permit before making GCP API call
         let _permit = self.rate_limiter.acquire().await.unwrap();
-        
+
         let token = self.get_access_token().await?;
         let url = format!(
             "https://iam.googleapis.com/v1/projects/{}/serviceAccounts",
@@ -279,7 +279,7 @@ impl ZeroTrustAgent {
     async fn get_iam_insights(&self) -> Result<Vec<IamInsight>> {
         // Acquire rate limiter permit before making GCP API call
         let _permit = self.rate_limiter.acquire().await.unwrap();
-        
+
         let token = self.get_access_token().await?;
 
         // Query IAM policy insights
@@ -360,7 +360,7 @@ impl ZeroTrustAgent {
     async fn scan_stale_secrets(&self) -> Result<Vec<SecretRotationRequest>> {
         // Acquire rate limiter permit before making GCP API call
         let _permit = self.rate_limiter.acquire().await.unwrap();
-        
+
         let token = self.get_access_token().await?;
         let url = format!(
             "https://secretmanager.googleapis.com/v1/projects/{}/secrets",

@@ -73,26 +73,26 @@ async fn main() -> Result<()> {
 
 async fn run_train_cherry_pick(depth: u32) -> Result<()> {
     info!("Starting CherryPickAgent training (depth: {})", depth);
-    
+
     let agent = create_cherry_pick_agent().await?;
     let count = agent.train_on_history(depth).await?;
-    
+
     info!("Training complete. Learned {} patterns.", count);
     Ok(())
 }
 
 async fn run_cherry_pick(commit: String, branch: String) -> Result<()> {
     info!("Running CherryPickAgent (commit: {}, branch: {})", commit, branch);
-    
+
     let agent = create_cherry_pick_agent().await?;
     let result = agent.execute_and_learn(&commit, &branch).await?;
-    
+
     info!("Cherry-pick result: {:?}", result);
-    
+
     if !result.success {
         std::process::exit(1);
     }
-    
+
     Ok(())
 }
 
