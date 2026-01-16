@@ -103,7 +103,7 @@ impl GcpDiscovery {
         let response = self
             .http_client
             .get(&url)
-            .bearer_auth(&credentials.access_token)
+            .bearer_auth(credentials.access_token().unwrap_or_default())
             .send()
             .await?;
 
@@ -172,7 +172,7 @@ impl CloudDiscovery for GcpDiscovery {
         if let Ok(resp) = self
             .http_client
             .get(&secrets_url)
-            .bearer_auth(&credentials.access_token)
+            .bearer_auth(credentials.access_token().unwrap_or_default())
             .send()
             .await
         {
@@ -213,7 +213,7 @@ impl CloudDiscovery for GcpDiscovery {
                 let resp = self
                     .http_client
                     .get(&url)
-                    .bearer_auth(&credentials.access_token)
+                    .bearer_auth(credentials.access_token().unwrap_or_default())
                     .send()
                     .await?;
 
@@ -302,7 +302,7 @@ impl AzureDiscovery {
         let resp = self
             .http_client
             .get(&url)
-            .bearer_auth(&credentials.access_token)
+            .bearer_auth(credentials.access_token().unwrap_or_default())
             .send()
             .await?;
 
@@ -429,9 +429,13 @@ impl CloudflareDiscovery {
 
         let record_id = record["id"].as_str().context("Record ID not found")?;
 
-        // Determine record type (A for IP, CNAME for hostname)
-        let record_type = if address.parse::<std::net::IpAddr>().is_ok() {
-            "A"
+        // Determine record type (A for IPv4, AAAA for IPv6, CNAME for hostname)
+        let record_type = if let Ok(ip) = address.parse::<std::net::IpAddr>() {
+            if ip.is_ipv4() {
+                "A"
+            } else {
+                "AAAA"
+            }
         } else {
             "CNAME"
         };
@@ -463,6 +467,34 @@ impl CloudflareDiscovery {
 
         info!("Updated DNS record {} -> {}", domain, address);
         Ok(())
+    }
+
+    /// Get the current value of a DNS record
+    pub async fn get_dns_record_value(&self, domain: &str, token: &str) -> Result<String> {
+        let list_url = format!(
+            "https://api.cloudflare.com/client/v4/zones/{}/dns_records?name={}",
+            self.zone_id, domain
+        );
+
+        let list_resp = self
+            .http_client
+            .get(&list_url)
+            .bearer_auth(token)
+            .send()
+            .await?;
+
+        let list_data: serde_json::Value = list_resp.json().await?;
+
+        let record = list_data["result"]
+            .as_array()
+            .and_then(|r| r.first())
+            .context("DNS record not found")?;
+
+        let content = record["content"]
+            .as_str()
+            .context("Record content not found")?;
+
+        Ok(content.to_string())
     }
 }
 

@@ -4,6 +4,7 @@
 //! Replaces the Python cloudflare-dns-agent with a high-performance Rust implementation.
 
 use anyhow::{Context, Result};
+use base64::Engine;
 use clap::Parser;
 use kube::{Api, Client};
 use k8s_openapi::api::networking::v1::Ingress;
@@ -270,10 +271,9 @@ async fn get_cloudflare_token() -> Result<String> {
         .as_str()
         .context("Secret payload not found")?;
 
-    let payload = base64::Engine::decode(
-        &base64::engine::general_purpose::STANDARD,
-        payload_b64,
-    )?;
+    let payload = base64::engine::general_purpose::STANDARD
+        .decode(payload_b64)
+        .context("Failed to decode secret payload")?;
 
     Ok(String::from_utf8(payload)?.trim().to_string())
 }
@@ -285,6 +285,8 @@ async fn get_gcp_access_token() -> Result<String> {
         .build()?;
 
     // Try metadata server first (GKE with Workload Identity)
+    // NOTE: Metadata server is HTTP-only by design and only accessible internally.
+    // This URL is acknowledged as secure because it never leaves the internal VPC.
     let metadata_url = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
 
     if let Ok(resp) = client

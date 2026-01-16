@@ -232,8 +232,26 @@ impl CrossCloudReconciler {
             }
         }
 
-        // Find best performing healthy provider
-        let current_provider = "gcp"; // Assume GCP is current
+        // Discover the current active provider from Cloudflare DNS
+        let current_provider = if let (Some(token), Some(cloudflare)) = (&self.cloudflare_token, &self.discovery.cloudflare) {
+            match cloudflare.get_dns_record_value(domain, token).await {
+                Ok(value) => {
+                    if value.contains("amazonaws.com") || value.contains("elb.amazonaws.com") {
+                        "aws"
+                    } else if value.contains("azurefd.net") {
+                        "azure"
+                    } else if value.chars().next().map_or(false, |c| c.is_ascii_digit()) {
+                        "gcp" // GCP typically uses naked IPs for global LB
+                    } else {
+                        "gcp" // Default fallthrough
+                    }
+                }
+                Err(_) => "gcp",
+            }
+        } else {
+            "gcp"
+        };
+
         let best = provider_latencies
             .iter()
             .filter(|(_, _, healthy)| *healthy)
@@ -243,7 +261,7 @@ impl CrossCloudReconciler {
             if *best_provider != current_provider {
                 let current_latency = provider_latencies
                     .iter()
-                    .find(|(p, _, _)| *p == current_provider)
+                    .find(|(p, _, _)| p == &current_provider)
                     .map(|(_, l, _)| *l)
                     .unwrap_or(u64::MAX);
 

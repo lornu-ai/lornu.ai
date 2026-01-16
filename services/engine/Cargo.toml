@@ -56,6 +56,9 @@ octocrab = { version = "0.41", optional = true }
 # Base64 encoding for Secret Manager payloads
 base64 = "0.22"
 
+# XML parsing for AWS STS responses
+quick-xml = { version = "0.31", features = ["serialize"] }
+
 # OpenAI client for embeddings (optional - for cherry-pick agent)
 async-openai = { version = "0.24", optional = true }
 

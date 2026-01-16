@@ -12,9 +12,28 @@ use tracing::info;
 /// Cloud identity credentials with automatic refresh
 #[derive(Debug, Clone)]
 pub struct CloudCredentials {
-    pub access_token: String,
+    pub value: CredentialValue,
     pub expires_at: Instant,
     pub provider: IdentityProvider,
+}
+
+#[derive(Debug, Clone)]
+pub enum CredentialValue {
+    Token(String),
+    AwsKeys {
+        access_key_id: String,
+        secret_access_key: String,
+        session_token: String,
+    },
+}
+
+impl CloudCredentials {
+    pub fn access_token(&self) -> Option<&str> {
+        match &self.value {
+            CredentialValue::Token(t) => Some(t),
+            _ => None,
+        }
+    }
 }
 
 impl CloudCredentials {
@@ -166,19 +185,20 @@ impl FederatedIdentityManager {
         // Parse XML response (STS returns XML by default)
         let body = response.text().await?;
         
-        // Simple XML parsing for credentials
-        let access_key = extract_xml_value(&body, "AccessKeyId")
-            .context("Missing AccessKeyId in STS response")?;
-        let secret_key = extract_xml_value(&body, "SecretAccessKey")
-            .context("Missing SecretAccessKey in STS response")?;
-        let session_token = extract_xml_value(&body, "SessionToken")
-            .context("Missing SessionToken in STS response")?;
+        let sts_response: AwsStsResponse = quick_xml::de::from_str(&body)
+            .context("Failed to parse AWS STS XML response")?;
+        
+        let creds = sts_response.response.result.credentials;
 
         info!("AWS credentials obtained via IRSA for role: {}", role_arn);
 
         // AWS STS tokens typically expire in 1 hour
         Ok(CloudCredentials {
-            access_token: format!("{}:{}:{}", access_key, secret_key, session_token),
+            value: CredentialValue::AwsKeys {
+                access_key_id: creds.access_key_id,
+                secret_access_key: creds.secret_access_key,
+                session_token: creds.session_token,
+            },
             expires_at: Instant::now() + Duration::from_secs(3600),
             provider: IdentityProvider::Aws,
         })
@@ -246,7 +266,7 @@ impl FederatedIdentityManager {
         info!("GCP credentials obtained via Workload Identity Federation");
 
         Ok(CloudCredentials {
-            access_token,
+            value: CredentialValue::Token(access_token),
             expires_at: Instant::now() + Duration::from_secs(expires_in),
             provider: IdentityProvider::Gcp,
         })
@@ -311,7 +331,7 @@ impl FederatedIdentityManager {
         info!("Azure credentials obtained via Workload Identity");
 
         Ok(CloudCredentials {
-            access_token,
+            value: CredentialValue::Token(access_token),
             expires_at: Instant::now() + Duration::from_secs(expires_in),
             provider: IdentityProvider::Azure,
         })
@@ -338,8 +358,9 @@ impl FederatedIdentityManager {
     }
 }
 
-/// Simple XML value extraction (avoiding full XML parser dependency)
-fn extract_xml_value(xml: &str, tag: &str) -> Option<String> {
+/// No longer used internally, replaced by quick-xml
+#[deprecated(note = "Use quick-xml for robust parsing")]
+fn _extract_xml_value(xml: &str, tag: &str) -> Option<String> {
     let start_tag = format!("<{}>", tag);
     let end_tag = format!("</{}>", tag);
 
@@ -371,7 +392,7 @@ mod tests {
     #[test]
     fn test_credentials_expiry() {
         let creds = CloudCredentials {
-            access_token: "test".to_string(),
+            value: CredentialValue::Token("test".to_string()),
             expires_at: Instant::now() + Duration::from_secs(3600),
             provider: IdentityProvider::Gcp,
         };

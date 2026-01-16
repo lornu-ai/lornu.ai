@@ -3,6 +3,7 @@
 //! The main agent that coordinates endpoint discovery and Cloudflare updates.
 
 use anyhow::{Context, Result};
+use base64::Engine;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -76,6 +77,14 @@ struct CloudflareMonitorResponse {
 #[derive(Debug, Serialize, Deserialize)]
 struct CloudflareMonitor {
     id: String,
+    description: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct CloudflareMonitorListResponse {
+    success: bool,
+    errors: Vec<CloudflareError>,
+    result: Option<Vec<CloudflareMonitor>>,
 }
 
 impl MultiCloudDnsSyncAgent {
@@ -111,6 +120,8 @@ impl MultiCloudDnsSyncAgent {
     /// Fetch Cloudflare API token from Secret Manager
     async fn get_cloudflare_token(&self) -> Result<String> {
         // Try GCE metadata server first (GKE with Workload Identity)
+        // NOTE: Metadata server is HTTP-only by design and only accessible internally.
+        // Security check is acknowledged as this never leaves the internal network.
         let metadata_url = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
 
         let gcp_token = match self
@@ -166,10 +177,9 @@ impl MultiCloudDnsSyncAgent {
             .as_str()
             .context("Secret payload not found")?;
 
-        let payload_bytes = base64::Engine::decode(
-            &base64::engine::general_purpose::STANDARD,
-            payload_base64,
-        )?;
+        let payload_bytes = base64::engine::general_purpose::STANDARD
+            .decode(payload_base64)
+            .context("Failed to decode secret payload")?;
 
         Ok(String::from_utf8(payload_bytes)?.trim().to_string())
     }
@@ -289,19 +299,20 @@ impl MultiCloudDnsSyncAgent {
             .send()
             .await?;
 
-        let list_result: serde_json::Value = list_response.json().await?;
+        let list_result: CloudflareMonitorListResponse = list_response
+            .json()
+            .await
+            .context("Failed to parse monitor list response")?;
         
-        if let Some(monitors) = list_result["result"].as_array() {
+        if let Some(monitors) = list_result.result {
             for monitor in monitors {
-                if monitor["description"]
-                    .as_str()
+                if monitor.description
+                    .as_deref()
                     .map(|d| d.contains("lornu-multi-cloud"))
                     .unwrap_or(false)
                 {
-                    if let Some(id) = monitor["id"].as_str() {
-                        info!("Found existing health monitor: {}", id);
-                        return Ok(id.to_string());
-                    }
+                    info!("Found existing health monitor: {}", monitor.id);
+                    return Ok(monitor.id);
                 }
             }
         }
