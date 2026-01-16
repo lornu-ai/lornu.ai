@@ -69,6 +69,8 @@ pub struct ZeroTrustAgent {
     secret_age_days: u32,
     /// Rate limiter for GCP API calls (max 10 concurrent requests)
     rate_limiter: Arc<Semaphore>,
+    /// CDK8s file path for IAM bindings (configurable)
+    cdk8s_file_path: String,
 }
 
 impl ZeroTrustAgent {
@@ -109,6 +111,8 @@ impl ZeroTrustAgent {
             inactivity_days: DEFAULT_INACTIVITY_DAYS,
             secret_age_days: DEFAULT_SECRET_AGE_DAYS,
             rate_limiter: Arc::new(Semaphore::new(10)), // Max 10 concurrent GCP API calls
+            cdk8s_file_path: std::env::var("LORNU_CDK8S_IAM_FILE")
+                .unwrap_or_else(|_| "infra/constructs/iam-bindings.ts".to_string()),
         };
 
         agent.ensure_collection().await?;
@@ -126,6 +130,12 @@ impl ZeroTrustAgent {
     /// Set custom secret age threshold
     pub fn with_secret_age_days(mut self, days: u32) -> Self {
         self.secret_age_days = days;
+        self
+    }
+
+    /// Set custom CDK8s file path for IAM bindings
+    pub fn with_cdk8s_file_path(mut self, path: String) -> Self {
+        self.cdk8s_file_path = path;
         self
     }
 
@@ -154,7 +164,8 @@ impl ZeroTrustAgent {
     /// Get ADC access token for GCP API calls
     async fn get_access_token(&self) -> Result<String> {
         // Try GCE metadata server first (Workload Identity in GKE)
-        let metadata_url = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
+        // Note: GCP metadata server supports both HTTP and HTTPS, using HTTPS for security
+        let metadata_url = "https://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
 
         match self
             .http_client
@@ -539,7 +550,7 @@ impl ZeroTrustAgent {
                 proposed_state,
                 rationale,
                 risk_level: insight.severity.clone(),
-                cdk8s_file_path: Some("infra/constructs/iam-bindings.ts".to_string()),
+                cdk8s_file_path: Some(self.cdk8s_file_path.clone()),
                 created_at: Utc::now(),
             });
         }
@@ -707,8 +718,18 @@ impl ZeroTrustAgent {
                 .get("rollback_count")
                 .and_then(|v| v.as_integer())
                 .unwrap_or(0) as u32,
-            created_at: Utc::now(),
-            last_used_at: Utc::now(),
+            created_at: payload
+                .get("created_at")
+                .and_then(|v| v.as_str())
+                .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+                .map(|dt| dt.with_timezone(&Utc))
+                .unwrap_or_else(Utc::now),
+            last_used_at: payload
+                .get("last_used_at")
+                .and_then(|v| v.as_str())
+                .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+                .map(|dt| dt.with_timezone(&Utc))
+                .unwrap_or_else(Utc::now),
         })
     }
 
@@ -746,6 +767,7 @@ mod tests {
             inactivity_days: 90,
             secret_age_days: 90,
             rate_limiter: Arc::new(Semaphore::new(10)),
+            cdk8s_file_path: "infra/constructs/iam-bindings.ts".to_string(),
         };
 
         // Test low severity (5 or fewer unused permissions)

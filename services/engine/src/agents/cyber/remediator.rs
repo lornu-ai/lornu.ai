@@ -449,11 +449,35 @@ mod tests {
     use uuid::Uuid;
 
     #[test]
-    fn test_generate_typescript_delete_role() {
+        let correction = IamCorrection {
+            id: Uuid::new_v4(),
+            correction_type: CorrectionType::DeleteRole,
+            target: "unused-sa@project.iam.gserviceaccount.com".to_string(),
+            current_state: json!({"role": "roles/viewer"}),
+            proposed_state: json!(null),
+            rationale: "Role unused for 120+ days".to_string(),
+            risk_level: InsightSeverity::High,
+            cdk8s_file_path: Some("infra/test.ts".to_string()),
+            created_at: Utc::now(),
+        };
+        let ts = Remediator::generate_typescript_suggestion(&correction);
+        assert!(ts.contains("DELETE ROLE"));
         // Test would verify TypeScript generation for delete corrections
     }
 
-    #[test]
+        let correction = IamCorrection {
+            id: Uuid::new_v4(),
+            correction_type: CorrectionType::ShrinkRole,
+            target: "test-sa@project.iam.gserviceaccount.com".to_string(),
+            current_state: json!({"permissions": ["storage.objects.get", "storage.objects.list"]}),
+            proposed_state: json!({"permissions": ["storage.objects.get"]}),
+            rationale: "Remove unused permission".to_string(),
+            risk_level: InsightSeverity::Medium,
+            cdk8s_file_path: Some("infra/test.ts".to_string()),
+            created_at: Utc::now(),
+        };
+        let ts = Remediator::generate_typescript_suggestion(&correction);
+        assert!(ts.contains("SHRINK ROLE"));
     fn test_generate_typescript_shrink_role() {
         // Test would verify TypeScript generation for shrink corrections
     }
