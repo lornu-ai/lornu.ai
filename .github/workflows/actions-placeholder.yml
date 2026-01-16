@@ -1,0 +1,10 @@
+name: actions-placeholder
+
+on:
+  workflow_dispatch:
+
+jobs:
+  noop:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Placeholder workflow for CodeQL actions analyzer."
