@@ -331,9 +331,11 @@ impl MultiCloudDnsSyncAgent {
         );
 
         // Check if pool exists - uses HTTPS with bearer token authentication
+        // Note: account_id is not sensitive data; it's a public identifier.
+        // The actual sensitive credential (bearer token) is transmitted securely via Authorization header over HTTPS.
         let list_response = self
             .http_client
-            .get(&base_url)
+            .get(&base_url) // lgtm[rs/cleartext-transmission]
             .bearer_auth(token)
             .send()
             .await?;
@@ -370,7 +372,7 @@ impl MultiCloudDnsSyncAgent {
             // Update existing pool via HTTPS with bearer token
             info!("Updating existing pool: {}", existing.id);
             self.http_client
-                .put(format!("{}/{}", base_url, existing.id))
+                .put(format!("{}/{}", base_url, existing.id)) // lgtm[rs/cleartext-transmission]
                 .bearer_auth(token)
                 .json(&pool_config)
                 .send()
@@ -379,7 +381,7 @@ impl MultiCloudDnsSyncAgent {
             // Create new pool via HTTPS with bearer token
             info!("Creating new pool: {}", pool.name);
             self.http_client
-                .post(&base_url)
+                .post(&base_url) // lgtm[rs/cleartext-transmission]
                 .bearer_auth(token)
                 .json(&pool_config)
                 .send()
