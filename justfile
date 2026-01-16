@@ -154,7 +154,7 @@ apply-dry-run env="dev":
     cd infra && LORNU_ENV={{env}} bun run apply:dry-run
 
 # ============================================
-# AI Agents
+# AI Agents (Issue #37)
 # ============================================
 
 # Train the cherry-pick agent on past PR conflict resolutions
