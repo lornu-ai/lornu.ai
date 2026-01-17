@@ -2,73 +2,8 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: tekton-promoter-sa
-  namespace: lornu-ci
-  labels:
-    lornu.ai/environment: production
-    lornu.ai/component: tekton
-    lornu.ai/managed-by: flux
+  namespace: tekton-pipelines
   annotations:
-    # AWS IRSA - Role must have ECR push permissions
-    # Replace __AWS_PROMOTER_ROLE_ARN__ before applying
-    eks.amazonaws.com/role-arn: __AWS_PROMOTER_ROLE_ARN__
----
-# ESO ServiceAccount for secret store access (OIDC-based)
-apiVersion: external-secrets.io/v1beta1
-kind: ClusterSecretStore
-metadata:
-  name: lornu-promoter-aws
-  labels:
-    lornu.ai/environment: production
-    lornu.ai/component: eso
-    lornu.ai/managed-by: flux
-spec:
-  provider:
-    aws:
-      service: SecretsManager
-      region: us-east-2
-      auth:
-        jwt:
-          serviceAccountRef:
-            name: tekton-promoter-sa
-            namespace: lornu-ci
----
-apiVersion: external-secrets.io/v1beta1
-kind: ClusterSecretStore
-metadata:
-  name: lornu-promoter-gcp
-  labels:
-    lornu.ai/environment: production
-    lornu.ai/component: eso
-    lornu.ai/managed-by: flux
-spec:
-  provider:
-    gcpsm:
-      # Replace __GCP_*__ placeholders before applying
-      projectID: __GCP_PROJECT_ID__
-      auth:
-        workloadIdentity:
-          clusterLocation: __GCP_CLUSTER_LOCATION__
-          clusterName: __GCP_CLUSTER_NAME__
-          clusterProjectID: __GCP_PROJECT_ID__
-          serviceAccountRef:
-            name: tekton-promoter-sa
-            namespace: lornu-ci
----
-apiVersion: external-secrets.io/v1beta1
-kind: ClusterSecretStore
-metadata:
-  name: lornu-promoter-azure
-  labels:
-    lornu.ai/environment: production
-    lornu.ai/component: eso
-    lornu.ai/managed-by: flux
-spec:
-  provider:
-    azurekv:
-      # Replace __AZURE_*__ placeholders before applying
-      tenantId: __AZURE_TENANT_ID__
-      vaultUrl: __AZURE_KEYVAULT_URL__
-      authType: WorkloadIdentity
-      serviceAccountRef:
-        name: tekton-promoter-sa
-        namespace: lornu-ci
+    azure.workload.identity/use: "true"
+    # Set via environment-specific patch or overlay.
+    azure.workload.identity/client-id: ""

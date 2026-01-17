@@ -1,18 +1,22 @@
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
-  generateName: cloud-promote-
+  generateName: build-and-promote-
   namespace: tekton-pipelines
   labels:
     lornu.ai/component: tekton
 spec:
   pipelineRef:
-    name: cloud-promote
+    name: build-and-promote
   taskRunTemplate:
     serviceAccountName: tekton-promoter-sa
   params:
-    - name: source-image
+    - name: image
       value: registry.example.com/__IMAGE_NAME__:__IMAGE_TAG__
+    - name: dockerfile
+      value: ./Dockerfile
+    - name: context
+      value: .
     - name: aws-region
       value: us-east-1
     - name: aws-role-arn
@@ -27,3 +31,15 @@ spec:
       value: REPLACE_WITH_AZURE_TENANT_ID
     - name: gcp-target
       value: us-docker.pkg.dev/project/repo/__IMAGE_NAME__:__IMAGE_TAG__
+  workspaces:
+    - name: source
+      volumeClaimTemplate:
+        metadata:
+          labels:
+            lornu.ai/component: tekton
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 5Gi

@@ -219,12 +219,12 @@ promote-multi-cloud image tag:
 # Apply Tekton OIDC promotion resources to cluster
 apply-tekton-promote:
     @echo "Applying Tekton OIDC promotion resources..."
-    kubectl apply -k ci/tekton/ -n lornu-ci
+    kubectl apply -k ci/tekton/ -n tekton-pipelines
 
 # Validate Tekton promotion manifests (dry-run)
 validate-tekton-promote:
     @echo "Validating Tekton OIDC promotion manifests..."
-    kubectl apply -k ci/tekton/ -n lornu-ci --dry-run=server
+    kubectl apply -k ci/tekton/ -n tekton-pipelines --dry-run=server
 
 # ============================================
 # Clean & Security Lifecycle (Issue #44)

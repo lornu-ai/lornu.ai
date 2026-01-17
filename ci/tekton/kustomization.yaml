@@ -7,6 +7,11 @@ resources:
   - flux-provider-tekton.yaml
   - flux-alert-tekton.yaml
   - tekton-triggers-rbac.yaml
+  - tekton-promoter-sa.yaml
+  - pipeline-cloud-promote.yaml
+  - pipeline-build-promote.yaml
+  - task-cloud-promote-artifact.yaml
+  - task-build-image-artifact.yaml
   - task-dagger-pipeline.yaml
   - pipeline-dagger.yaml
   - trigger-binding-flux.yaml

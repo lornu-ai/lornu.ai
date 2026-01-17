@@ -1,19 +1,13 @@
 apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
-  name: build-and-promote
+  name: cloud-promote
   namespace: tekton-pipelines
 spec:
   params:
-    - name: image
+    - name: source-image
       type: string
-      description: "Image name to build (registry/repo:tag)"
-    - name: dockerfile
-      type: string
-      default: ./Dockerfile
-    - name: context
-      type: string
-      default: .
+      description: "Image reference to promote (e.g., registry/app@sha256:...)"
     - name: aws-region
       type: string
       description: "AWS region for ECR auth"
@@ -46,28 +40,13 @@ spec:
       default: /var/run/secrets/tokens/gcp-token
   taskRunTemplate:
     serviceAccountName: tekton-promoter-sa
-  workspaces:
-    - name: source
   tasks:
-    - name: build
-      taskRef:
-        name: build-image-artifact
-      params:
-        - name: image
-          value: $(params.image)
-        - name: dockerfile
-          value: $(params.dockerfile)
-        - name: context
-          value: $(params.context)
-      workspaces:
-        - name: source
-          workspace: source
     - name: promote
       taskRef:
         name: cloud-promote-artifact
       params:
         - name: source-image
-          value: $(tasks.build.results.image-ref)
+          value: $(params.source-image)
         - name: aws-region
           value: $(params.aws-region)
         - name: aws-role-arn
@@ -88,5 +67,3 @@ spec:
           value: $(params.gcp-target)
         - name: gcp-token-path
           value: $(params.gcp-token-path)
-      runAfter:
-        - build
