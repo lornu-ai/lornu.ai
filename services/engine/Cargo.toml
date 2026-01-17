@@ -68,6 +68,10 @@ qdrant-client = { version = "1.12", optional = true }
 # Git operations (optional - for cherry-pick agent)
 git2 = { version = "0.19", optional = true }
 
+# SSH key generation (optional - for ssh-key-agent)
+ssh-key = { version = "0.6", features = ["alloc", "ed25519", "rand_core"], optional = true }
+rand = { version = "0.8", optional = true }
+
 # Chrono for timestamps
 chrono = { version = "0.4", features = ["serde"] }
 
@@ -80,9 +84,11 @@ home = "=0.5.9"
 
 [features]
 default = ["full"]
-full = ["gcloud-sdk", "cloudflare", "octocrab", "async-openai", "qdrant-client", "git2"]
+full = ["gcloud-sdk", "cloudflare", "octocrab", "async-openai", "qdrant-client", "git2", "ssh-key", "rand"]
 # dns-sync includes all deps for now (lib.rs exports modules that use them)
 dns-sync = ["gcloud-sdk", "cloudflare", "octocrab", "async-openai", "qdrant-client", "git2"]
+# ssh-key-gen: SSH key generation and GCP Secret Manager storage
+ssh-key-gen = ["gcloud-sdk", "ssh-key", "rand"]
 
 [[bin]]
 name = "engine"
@@ -91,6 +97,11 @@ path = "src/main.rs"
 [[bin]]
 name = "dns-sync-agent"
 path = "src/bin/dns_sync_agent.rs"
+
+[[bin]]
+name = "ssh-key-agent"
+path = "src/bin/ssh_key_agent.rs"
+required-features = ["ssh-key-gen"]
 
 [dev-dependencies]
 # Testing utilities
