@@ -1,0 +1,41 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: build-image-artifact
+  namespace: tekton-pipelines
+spec:
+  params:
+    - name: image
+      description: "Full image reference including registry/repo"
+      type: string
+    - name: dockerfile
+      type: string
+      default: ./Dockerfile
+    - name: context
+      type: string
+      default: .
+  workspaces:
+    - name: source
+  results:
+    - name: image-digest
+      description: "Image digest produced by the build"
+    - name: image-ref
+      description: "Fully qualified image reference with digest"
+  artifacts:
+    outputs:
+      - name: built-image
+        path: /tekton/results/image-ref
+  steps:
+    - name: build
+      image: gcr.io/kaniko-project/executor:v1.23.2
+      args:
+        - --context=$(workspaces.source.path)/$(params.context)
+        - --dockerfile=$(workspaces.source.path)/$(params.dockerfile)
+        - --destination=$(params.image)
+        - --digest-file=$(results.image-digest.path)
+    - name: record-ref
+      image: busybox:1.36
+      script: |
+        set -e
+        digest="$(cat $(results.image-digest.path))"
+        echo "$(params.image)@${digest}" > /tekton/results/image-ref

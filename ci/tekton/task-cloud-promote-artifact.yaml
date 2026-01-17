@@ -1,0 +1,131 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: cloud-promote-artifact
+  namespace: tekton-pipelines
+spec:
+  params:
+    - name: source-image
+      description: "Image reference to promote (e.g., registry/app@sha256:...)"
+      type: string
+    - name: aws-region
+      description: "AWS region for ECR auth"
+      type: string
+    - name: aws-role-arn
+      description: "AWS role ARN for web identity auth"
+      type: string
+      default: ""
+    - name: aws-web-identity-token-path
+      description: "AWS web identity token path"
+      type: string
+      default: /var/run/secrets/kubernetes.io/serviceaccount/token
+    - name: aws-target
+      description: "AWS ECR target (e.g., 123.dkr.ecr.us-east-1.amazonaws.com/app:latest)"
+      type: string
+    - name: azure-target
+      description: "Azure ACR target (e.g., registry.azurecr.io/app:latest)"
+      type: string
+    - name: azure-client-id
+      description: "Azure Workload Identity client ID"
+      type: string
+      default: ""
+    - name: azure-tenant-id
+      description: "Azure tenant ID for token exchange"
+      type: string
+      default: ""
+    - name: azure-federated-token-path
+      description: "Azure federated token path"
+      type: string
+      default: /var/run/secrets/azure/tokens/azure-identity-token
+    - name: gcp-target
+      description: "GCP GAR target (e.g., us-docker.pkg.dev/project/repo/app:latest)"
+      type: string
+    - name: gcp-token-path
+      description: "Path to projected GCP OIDC token"
+      type: string
+      default: /var/run/secrets/tokens/gcp-token
+  volumes:
+    - name: auth
+      emptyDir: {}
+  artifacts:
+    inputs:
+      - name: built-image
+  steps:
+    - name: aws-login
+      image: public.ecr.aws/aws-cli/aws-cli:2.15.48
+      env:
+        - name: AWS_REGION
+          value: $(params.aws-region)
+        - name: AWS_ROLE_ARN
+          value: $(params.aws-role-arn)
+        - name: AWS_WEB_IDENTITY_TOKEN_FILE
+          value: $(params.aws-web-identity-token-path)
+      volumeMounts:
+        - name: auth
+          mountPath: /workspace/auth
+      script: |
+        set -euo pipefail
+        aws ecr get-login-password --region "$AWS_REGION" > /workspace/auth/aws-pass
+    - name: azure-token
+      image: curlimages/curl:8.6.0
+      volumeMounts:
+        - name: auth
+          mountPath: /workspace/auth
+      script: |
+        set -euo pipefail
+        client_id="$(params.azure-client-id)"
+        tenant_id="$(params.azure-tenant-id)"
+        token_file="$(params.azure-federated-token-path)"
+        if [ -z "$client_id" ]; then
+          client_id="${AZURE_CLIENT_ID:-}"
+        fi
+        if [ -z "$tenant_id" ]; then
+          tenant_id="${AZURE_TENANT_ID:-}"
+        fi
+        if [ -z "$token_file" ]; then
+          token_file="${AZURE_FEDERATED_TOKEN_FILE:-}"
+        fi
+        if [ -z "$client_id" ] || [ -z "$tenant_id" ]; then
+          echo "Missing Azure client or tenant ID for Workload Identity." >&2
+          exit 1
+        fi
+        if [ ! -f "$token_file" ]; then
+          echo "Missing Azure federated token at ${token_file}" >&2
+          exit 1
+        fi
+        response="$(curl -sS -X POST \
+          -H "Content-Type: application/x-www-form-urlencoded" \
+          --data-urlencode "client_id=${client_id}" \
+          --data-urlencode "scope=https://management.azure.com/.default" \
+          --data-urlencode "grant_type=client_credentials" \
+          --data-urlencode "client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer" \
+          --data-urlencode "client_assertion=$(cat ${token_file})" \
+          "https://login.microsoftonline.com/${tenant_id}/oauth2/v2.0/token")"
+        token="$(echo "$response" | tr -d '\n' | sed -n 's/.*\"access_token\":\"\\([^\"]*\\)\".*/\\1/p')"
+        if [ -z "$token" ]; then
+          echo "Failed to retrieve Azure access token." >&2
+          exit 1
+        fi
+        printf "%s" "$token" > /workspace/auth/azure-pass
+    - name: promote
+      image: quay.io/skopeo/stable:v1.14
+      volumeMounts:
+        - name: auth
+          mountPath: /workspace/auth
+      script: |
+        set -euo pipefail
+        aws_registry="$(echo "$(params.aws-target)" | cut -d/ -f1)"
+        azure_registry="$(echo "$(params.azure-target)" | cut -d/ -f1)"
+        gcp_registry="$(echo "$(params.gcp-target)" | cut -d/ -f1)"
+        if [ ! -f "$(params.gcp-token-path)" ]; then
+          echo "Missing GCP token at $(params.gcp-token-path)" >&2
+          exit 1
+        fi
+        echo "Promoting image: $(params.source-image)"
+        skopeo login --username AWS --password-stdin "$aws_registry" < /workspace/auth/aws-pass
+        skopeo login --username 00000000-0000-0000-0000-000000000000 --password-stdin "$azure_registry" < /workspace/auth/azure-pass
+        skopeo login --username oauth2accesstoken --password "$(cat $(params.gcp-token-path))" "$gcp_registry"
+        skopeo copy --all docker://$(params.source-image) docker://$(params.aws-target)
+        skopeo copy --all docker://$(params.source-image) docker://$(params.azure-target)
+        skopeo copy --all docker://$(params.source-image) docker://$(params.gcp-target)
+        echo "Promotion complete"

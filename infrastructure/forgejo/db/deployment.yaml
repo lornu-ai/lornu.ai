@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: forgejo-db
+  labels:
+    app: forgejo-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: forgejo-db
+  template:
+    metadata:
+      labels:
+        app: forgejo-db
+    spec:
+      containers:
+        - name: postgres
+          image: bitnami/postgresql:16
+          env:
+            - name: POSTGRESQL_USERNAME
+              value: "forgejo"
+            - name: POSTGRESQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: forgejo-db-secret
+                  key: password
+            - name: POSTGRESQL_DATABASE
+              value: "forgejo"
+          ports:
+            - name: postgres
+              containerPort: 5432
+          volumeMounts:
+            - name: db-data
+              mountPath: /bitnami/postgresql
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: db-data
+          persistentVolumeClaim:
+            claimName: forgejo-db-pvc
