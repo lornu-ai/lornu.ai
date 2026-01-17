@@ -15,7 +15,8 @@
     "ci:generate-workflow": "bun ci/generate-workflow.ts",
     "ci:generate-tekton": "bun ci/generate-tekton.ts",
     "setup:github-bot": "bun scripts/setup-github-bot.ts",
-    "find:github-app-installation": "bun scripts/find-github-app-installation-id.ts"
+    "find:github-app-installation": "bun scripts/find-github-app-installation-id.ts",
+    "agent:pr-rebase": "bun ai-agents/ai-agent-pr-rebase/index.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",
