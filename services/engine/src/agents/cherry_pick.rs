@@ -10,7 +10,6 @@
 //! - Self-corrects by looking up similar past conflicts
 
 use anyhow::{Context, Result};
-use async_openai::config::OpenAIConfig;
 use chrono::{DateTime, Utc};
 use git2::{CherrypickOptions, Index, Repository, Signature};
 use qdrant_client::qdrant::{

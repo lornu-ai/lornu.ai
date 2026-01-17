@@ -445,8 +445,6 @@ impl Remediator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
-    use uuid::Uuid;
 
     #[test]
     fn test_generate_typescript_delete_role() {
@@ -458,8 +456,8 @@ mod tests {
         // Test would verify TypeScript generation for shrink corrections
     }
 
-    #[test]
-    fn test_merge_typescript_changes_empty() {
+    #[tokio::test]
+    async fn test_merge_typescript_changes_empty() {
         let remediator = Remediator {
             org: "test".to_string(),
             repo: "test".to_string(),

@@ -141,7 +141,7 @@ impl Drop for TempFileGuard {
 ///
 /// # Example
 ///
-/// ```rust
+/// ```rust,no_run
 /// use lornu_engine::agents::lifecycle::exec_with_secret_env;
 ///
 /// exec_with_secret_env(
@@ -177,7 +177,7 @@ pub fn exec_with_secret_env(
 ///
 /// # Example
 ///
-/// ```rust
+/// ```rust,no_run
 /// use lornu_engine::agents::lifecycle::exec_with_secret_stdin;
 ///
 /// exec_with_secret_stdin(
@@ -224,8 +224,7 @@ pub fn cleanup_sensitive_files(base_dir: &PathBuf, patterns: &[&str]) -> Result<
 
     fn matches_pattern(filename: &str, pattern: &str) -> bool {
         // Simple glob matching for common patterns
-        if pattern.starts_with("**/") {
-            let suffix = &pattern[3..];
+        if let Some(suffix) = pattern.strip_prefix("**/") {
             filename.ends_with(suffix)
         } else if pattern.starts_with("*.") {
             let ext = &pattern[1..];

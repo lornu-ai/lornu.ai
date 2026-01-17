@@ -1,0 +1,26 @@
+# Multi-stage build for DNS Sync Agent
+FROM rust:1.83-slim AS builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy workspace files
+COPY Cargo.toml Cargo.lock ./
+COPY services/engine/Cargo.toml services/engine/
+COPY services/engine/src services/engine/src
+
+# Build release binary
+WORKDIR /app/services/engine
+RUN cargo build --release --bin dns-sync-agent
+
+# Runtime image
+FROM gcr.io/distroless/cc-debian12
+
+COPY --from=builder /app/services/engine/target/release/dns-sync-agent /
+
+ENTRYPOINT ["/dns-sync-agent"]

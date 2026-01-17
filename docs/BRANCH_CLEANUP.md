@@ -4,51 +4,45 @@
 
 > **"Only `ta` is long-lived - All other branches are temporary"**
 
-## Current Branch Analysis
+## How to Identify Stale Branches
 
-### ✅ Keep: `ta` (trunk)
-- **Status**: Main branch, always deployable
-- **Action**: Keep - this is the trunk
+### 1. Find branches already merged into `ta`
+These branches are generally safe to delete.
 
-### ❓ Review: `develop`
-- **Status**: Has 1 unique commit not in `ta`
-  - `feat(agents): add Cloudflare DNS agent in Rust`
-- **Recommendation**:
-  - **If work needs to be merged**: Create PR from `develop` → `ta`, then delete `develop`
-  - **If work is obsolete**: Delete `develop`
-- **Action**: Review the Cloudflare DNS agent work and decide
+```bash
+# List local branches merged into ta
+git branch --merged ta
 
-### ❌ Delete: `build`
-- **Status**: No unique commits vs `ta`
-- **Commits**: Same as `deploy` branch
-- **Recommendation**: **DELETE** - Obsolete, violates trunk-based workflow
-- **Action**: Delete after confirming no active work
+# To delete them (example for 'my-feature-branch'):
+git branch -d my-feature-branch
+```
 
-### ❌ Delete: `deploy`
-- **Status**: No unique commits vs `ta`
-- **Commits**: Same as `build` branch
-- **Recommendation**: **DELETE** - Obsolete, violates trunk-based workflow
-- **Action**: Delete after confirming no active work
+### 2. Find branches with unique work
+These branches need review before deletion.
+
+```bash
+# See commits on a branch that are not in ta
+git log ta..my-feature-branch
+
+# If the work is needed, create a PR. If not, delete the remote branch.
+git push origin --delete my-feature-branch
+```
 
 ## Deletion Commands
 
 ```bash
-# Delete build branch (remote)
-git push origin --delete build
+# Delete a remote branch
+git push origin --delete branch-name
 
-# Delete deploy branch (remote)
-git push origin --delete deploy
-
-# Delete develop branch (after merging work to ta)
-git push origin --delete develop
+# After deleting remote branches, prune local stale branches
+git fetch --prune
 ```
 
 ## Summary
 
-**Recommended Actions:**
-1. ✅ Keep `ta` (trunk)
-2. ❓ Review `develop` - merge Cloudflare DNS agent work to `ta` if needed, then delete
-3. ❌ Delete `build` - obsolete
-4. ❌ Delete `deploy` - obsolete
+**Workflow:**
+1. ✅ Keep `ta` (trunk) - the only long-lived branch
+2. ❓ Review feature branches - check if work needs to be merged
+3. ❌ Delete merged/obsolete branches - keep repository clean
 
 This aligns with the trunk-based workflow where only `ta` is long-lived.

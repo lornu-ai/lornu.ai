@@ -1,0 +1,36 @@
+steps:
+  # Build the dns-sync-agent binary using Rust
+  - name: 'rust:latest'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        apt-get update && apt-get install -y --no-install-recommends pkg-config libssl-dev ca-certificates && rm -rf /var/lib/apt/lists/*
+        cd services
+        cargo build --release --bin dns-sync-agent
+        cp target/release/dns-sync-agent /workspace/dns-sync-agent
+        # Create minimal Dockerfile
+        cat > /workspace/Dockerfile.runtime <<'DOCKERFILE'
+        FROM gcr.io/distroless/cc-debian12
+        COPY dns-sync-agent /dns-sync-agent
+        ENTRYPOINT ["/dns-sync-agent"]
+        DOCKERFILE
+    dir: '.'
+
+  # Build minimal Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/lornu-ai/dns-sync-agent:latest'
+      - '-f'
+      - 'Dockerfile.runtime'
+      - '.'
+
+images:
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/lornu-ai/dns-sync-agent:latest'
+
+timeout: 1200s
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'
