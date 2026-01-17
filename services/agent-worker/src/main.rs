@@ -168,7 +168,8 @@ async fn execute_task(state: &AppState, req: &TaskRequest) -> Result<serde_json:
         "context": req.context
     });
 
-    let resp = state.http_client
+    let resp = state
+        .http_client
         .post(&state.llm_endpoint)
         .json(&llm_req)
         .send()

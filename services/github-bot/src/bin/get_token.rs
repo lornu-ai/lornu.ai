@@ -87,8 +87,8 @@ fn generate_jwt(app_id: &str, private_key_path: &str) -> Result<String> {
     let key_data = fs::read(private_key_path)
         .with_context(|| format!("Failed to read private key: {}", private_key_path))?;
 
-    let encoding_key = EncodingKey::from_rsa_pem(&key_data)
-        .context("Failed to parse private key as RSA PEM")?;
+    let encoding_key =
+        EncodingKey::from_rsa_pem(&key_data).context("Failed to parse private key as RSA PEM")?;
 
     let header = Header::new(Algorithm::RS256);
 
@@ -169,7 +169,10 @@ async fn main() -> Result<()> {
         eprintln!("✅ Token saved to {}", output_path);
     } else {
         println!("{}", output);
-        eprintln!("✅ Token generated successfully (expires: {})", token_response.expires_at);
+        eprintln!(
+            "✅ Token generated successfully (expires: {})",
+            token_response.expires_at
+        );
     }
 
     Ok(())

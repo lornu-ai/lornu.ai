@@ -21,16 +21,13 @@ pub struct GitHubTeamTool {
 /// Team member role
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum TeamRole {
+    #[default]
     Member,
     Maintainer,
 }
 
-impl Default for TeamRole {
-    fn default() -> Self {
-        Self::Member
-    }
-}
 
 /// Result of a team operation
 #[derive(Debug, Serialize)]
@@ -160,7 +157,10 @@ impl GitHubTeamTool {
                 warn!(error = %e, "Failed to remove member from team");
                 Ok(TeamOperationResult {
                     success: false,
-                    message: format!("Failed to remove {} from team {}: {}", username, team_slug, e),
+                    message: format!(
+                        "Failed to remove {} from team {}: {}",
+                        username, team_slug, e
+                    ),
                     team_slug: Some(team_slug.to_string()),
                     username: Some(username.to_string()),
                 })
@@ -180,11 +180,7 @@ impl GitHubTeamTool {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to list teams: {}", e))?;
 
-        let team_slugs: Vec<String> = teams
-            .items
-            .iter()
-            .map(|t| t.slug.clone())
-            .collect();
+        let team_slugs: Vec<String> = teams.items.iter().map(|t| t.slug.clone()).collect();
 
         Ok(team_slugs)
     }
@@ -201,11 +197,7 @@ impl GitHubTeamTool {
             .await
             .map_err(|e| anyhow::anyhow!("Failed to list team members: {}", e))?;
 
-        let usernames: Vec<String> = members
-            .items
-            .iter()
-            .map(|m| m.login.clone())
-            .collect();
+        let usernames: Vec<String> = members.items.iter().map(|m| m.login.clone()).collect();
 
         Ok(usernames)
     }

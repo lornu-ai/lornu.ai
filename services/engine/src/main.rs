@@ -3,6 +3,7 @@
 //! Core orchestration engine with secure tool integrations.
 //! Uses ADC (Application Default Credentials) - no secrets in code.
 
+#![allow(dead_code)]
 use anyhow::{Context, Result};
 use axum::{
     extract::State,
@@ -11,7 +12,6 @@ use axum::{
 };
 use clap::{Parser, Subcommand};
 use std::net::SocketAddr;
-use std::path::PathBuf;
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 use tracing::{info, warn, Level};

@@ -1,0 +1,96 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lornu-system
+  labels:
+    lornu.ai/component: system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dns-sync-agent
+  namespace: lornu-system
+  labels:
+    app: dns-sync-agent
+    lornu.ai/component: dns-sync
+    lornu.ai/managed-by: lornu-engine
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dns-sync-agent
+  template:
+    metadata:
+      labels:
+        app: dns-sync-agent
+        lornu.ai/component: dns-sync
+    spec:
+      serviceAccountName: dns-sync-agent
+      containers:
+        - name: dns-sync-agent
+          image: us-central1-docker.pkg.dev/gcp-lornu-ai/lornu-ai/dns-sync-agent:latest
+          args:
+            - --interval=60
+          env:
+            - name: CLOUDFLARE_ZONE_ID
+              valueFrom:
+                secretKeyRef:
+                  name: lornu-cluster-vars
+                  key: CLOUDFLARE_ZONE_ID
+            - name: CLOUDFLARE_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: lornu-cluster-vars
+                  key: CLOUDFLARE_API_TOKEN
+            - name: LORNU_GCP_PROJECT
+              value: gcp-lornu-ai
+            - name: INGRESS_LABEL_SELECTOR
+              value: "lornu.ai/dns-sync=enabled"
+            - name: RUST_LOG
+              value: "info"
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dns-sync-agent
+  namespace: lornu-system
+  annotations:
+    iam.gke.io/gcp-service-account: lornu-engine@gcp-lornu-ai.iam.gserviceaccount.com
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dns-sync-agent
+rules:
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dns-sync-agent
+subjects:
+  - kind: ServiceAccount
+    name: dns-sync-agent
+    namespace: lornu-system
+roleRef:
+  kind: ClusterRole
+  name: dns-sync-agent
+  apiGroup: rbac.authorization.k8s.io

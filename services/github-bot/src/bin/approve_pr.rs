@@ -50,7 +50,10 @@ struct Args {
     pr_numbers: Option<Vec<u64>>,
 
     /// Review message/body
-    #[arg(long, default_value = "Lornu AI Bot: Changes look good! Pre-computation verified.")]
+    #[arg(
+        long,
+        default_value = "Lornu AI Bot: Changes look good! Pre-computation verified."
+    )]
     message: String,
 
     /// Output format: text (default), json
@@ -275,7 +278,11 @@ async fn main() -> Result<()> {
 
     eprintln!(
         "🤖 {} {} PR(s) in {}/{}...",
-        if args.dry_run { "Checking" } else { "Approving" },
+        if args.dry_run {
+            "Checking"
+        } else {
+            "Approving"
+        },
         pr_numbers.len(),
         owner,
         repo
