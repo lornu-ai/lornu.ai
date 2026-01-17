@@ -1,0 +1,45 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: build-and-promote-
+  namespace: tekton-pipelines
+  labels:
+    lornu.ai/component: tekton
+spec:
+  pipelineRef:
+    name: build-and-promote
+  taskRunTemplate:
+    serviceAccountName: tekton-promoter-sa
+  params:
+    - name: image
+      value: registry.example.com/app:latest
+    - name: dockerfile
+      value: ./Dockerfile
+    - name: context
+      value: .
+    - name: aws-region
+      value: us-east-1
+    - name: aws-role-arn
+      value: arn:aws:iam::123456789012:role/tekton-promoter
+    - name: aws-target
+      value: 123456789012.dkr.ecr.us-east-1.amazonaws.com/app:latest
+    - name: azure-target
+      value: example.azurecr.io/app:latest
+    - name: azure-client-id
+      value: REPLACE_WITH_AZURE_CLIENT_ID
+    - name: azure-tenant-id
+      value: REPLACE_WITH_AZURE_TENANT_ID
+    - name: gcp-target
+      value: us-docker.pkg.dev/project/repo/app:latest
+  workspaces:
+    - name: source
+      volumeClaimTemplate:
+        metadata:
+          labels:
+            lornu.ai/component: tekton
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 5Gi
