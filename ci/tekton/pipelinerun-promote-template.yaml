@@ -1,44 +1,29 @@
-# PipelineRun template for multi-cloud promotion
-# Usage: Replace __PLACEHOLDERS__ before applying
-#   sed 's/__IMAGE_NAME__/my-image/g; s/__IMAGE_TAG__/v1.0.0/g' pipelinerun-promote-template.yaml | kubectl create -f -
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
-  generateName: build-promote-
-  namespace: lornu-ci
+  generateName: cloud-promote-
+  namespace: tekton-pipelines
   labels:
-    lornu.ai/environment: production
     lornu.ai/component: tekton
-    lornu.ai/managed-by: flux
 spec:
   pipelineRef:
-    name: build-promote-pipeline
-  taskRunSpecs:
-    - pipelineTaskName: promote
-      serviceAccountName: tekton-promoter-sa
+    name: cloud-promote
+  taskRunTemplate:
+    serviceAccountName: tekton-promoter-sa
   params:
-    - name: git-url
-      value: "https://github.com/lornu-ai/lornu.ai"
-    - name: git-revision
-      value: "__IMAGE_TAG__"
-    - name: image-name
-      value: "__IMAGE_NAME__"
-    # Configure targets - replace placeholders or leave empty to skip
-    # AWS ECR: __AWS_ACCOUNT_ID__.dkr.ecr.us-east-2.amazonaws.com/lornu/__IMAGE_NAME__
-    - name: aws-ecr-url
-      value: ""
-    # GCP GAR: us-docker.pkg.dev/__GCP_PROJECT_ID__/lornu/__IMAGE_NAME__
-    - name: gcp-gar-url
-      value: ""
-    # Azure ACR: __AZURE_ACR_NAME__.azurecr.io/lornu/__IMAGE_NAME__
-    - name: azure-acr-url
-      value: ""
-  workspaces:
-    - name: source
-      volumeClaimTemplate:
-        spec:
-          accessModes:
-            - ReadWriteOnce
-          resources:
-            requests:
-              storage: 1Gi
+    - name: source-image
+      value: registry.example.com/__IMAGE_NAME__:__IMAGE_TAG__
+    - name: aws-region
+      value: us-east-1
+    - name: aws-role-arn
+      value: arn:aws:iam::123456789012:role/tekton-promoter
+    - name: aws-target
+      value: 123456789012.dkr.ecr.us-east-1.amazonaws.com/__IMAGE_NAME__:__IMAGE_TAG__
+    - name: azure-target
+      value: example.azurecr.io/__IMAGE_NAME__:__IMAGE_TAG__
+    - name: azure-client-id
+      value: REPLACE_WITH_AZURE_CLIENT_ID
+    - name: azure-tenant-id
+      value: REPLACE_WITH_AZURE_TENANT_ID
+    - name: gcp-target
+      value: us-docker.pkg.dev/project/repo/__IMAGE_NAME__:__IMAGE_TAG__

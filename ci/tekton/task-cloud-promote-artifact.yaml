@@ -22,9 +22,11 @@ spec:
     - name: aws-target
       description: "AWS ECR target (e.g., 123.dkr.ecr.us-east-1.amazonaws.com/app:latest)"
       type: string
+      default: ""
     - name: azure-target
       description: "Azure ACR target (e.g., registry.azurecr.io/app:latest)"
       type: string
+      default: ""
     - name: azure-client-id
       description: "Azure Workload Identity client ID"
       type: string
@@ -40,6 +42,7 @@ spec:
     - name: gcp-target
       description: "GCP GAR target (e.g., us-docker.pkg.dev/project/repo/app:latest)"
       type: string
+      default: ""
     - name: gcp-token-path
       description: "Path to projected GCP OIDC token"
       type: string
@@ -65,14 +68,23 @@ spec:
           mountPath: /workspace/auth
       script: |
         set -euo pipefail
+        if [ -z "$(params.aws-target)" ]; then
+          echo "Skipping AWS ECR (no target provided)"
+          exit 0
+        fi
         aws ecr get-login-password --region "$AWS_REGION" > /workspace/auth/aws-pass
     - name: azure-token
-      image: curlimages/curl:8.6.0
+      image: alpine:3.19
       volumeMounts:
         - name: auth
           mountPath: /workspace/auth
       script: |
         set -euo pipefail
+        if [ -z "$(params.azure-target)" ]; then
+          echo "Skipping Azure ACR (no target provided)"
+          exit 0
+        fi
+        apk add --no-cache curl jq > /dev/null
         client_id="$(params.azure-client-id)"
         tenant_id="$(params.azure-tenant-id)"
         token_file="$(params.azure-federated-token-path)"
@@ -101,7 +113,7 @@ spec:
           --data-urlencode "client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer" \
           --data-urlencode "client_assertion=$(cat ${token_file})" \
           "https://login.microsoftonline.com/${tenant_id}/oauth2/v2.0/token")"
-        token="$(echo "$response" | tr -d '\n' | sed -n 's/.*\"access_token\":\"\\([^\"]*\\)\".*/\\1/p')"
+        token="$(echo "$response" | jq -r '.access_token // empty')"
         if [ -z "$token" ]; then
           echo "Failed to retrieve Azure access token." >&2
           exit 1
@@ -114,18 +126,24 @@ spec:
           mountPath: /workspace/auth
       script: |
         set -euo pipefail
-        aws_registry="$(echo "$(params.aws-target)" | cut -d/ -f1)"
-        azure_registry="$(echo "$(params.azure-target)" | cut -d/ -f1)"
-        gcp_registry="$(echo "$(params.gcp-target)" | cut -d/ -f1)"
-        if [ ! -f "$(params.gcp-token-path)" ]; then
-          echo "Missing GCP token at $(params.gcp-token-path)" >&2
-          exit 1
-        fi
         echo "Promoting image: $(params.source-image)"
-        skopeo login --username AWS --password-stdin "$aws_registry" < /workspace/auth/aws-pass
-        skopeo login --username 00000000-0000-0000-0000-000000000000 --password-stdin "$azure_registry" < /workspace/auth/azure-pass
-        skopeo login --username oauth2accesstoken --password "$(cat $(params.gcp-token-path))" "$gcp_registry"
-        skopeo copy --all docker://$(params.source-image) docker://$(params.aws-target)
-        skopeo copy --all docker://$(params.source-image) docker://$(params.azure-target)
-        skopeo copy --all docker://$(params.source-image) docker://$(params.gcp-target)
+        if [ -n "$(params.aws-target)" ]; then
+          aws_registry="$(echo "$(params.aws-target)" | cut -d/ -f1)"
+          skopeo login --username AWS --password-stdin "$aws_registry" < /workspace/auth/aws-pass
+          skopeo copy --all docker://$(params.source-image) docker://$(params.aws-target)
+        fi
+        if [ -n "$(params.azure-target)" ]; then
+          azure_registry="$(echo "$(params.azure-target)" | cut -d/ -f1)"
+          skopeo login --username 00000000-0000-0000-0000-000000000000 --password-stdin "$azure_registry" < /workspace/auth/azure-pass
+          skopeo copy --all docker://$(params.source-image) docker://$(params.azure-target)
+        fi
+        if [ -n "$(params.gcp-target)" ]; then
+          gcp_registry="$(echo "$(params.gcp-target)" | cut -d/ -f1)"
+          if [ ! -f "$(params.gcp-token-path)" ]; then
+            echo "Missing GCP token at $(params.gcp-token-path)" >&2
+            exit 1
+          fi
+          skopeo login --username oauth2accesstoken --password "$(cat $(params.gcp-token-path))" "$gcp_registry"
+          skopeo copy --all docker://$(params.source-image) docker://$(params.gcp-target)
+        fi
         echo "Promotion complete"

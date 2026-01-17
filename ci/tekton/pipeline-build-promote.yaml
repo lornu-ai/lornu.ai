@@ -25,8 +25,10 @@ spec:
       default: /var/run/secrets/kubernetes.io/serviceaccount/token
     - name: aws-target
       type: string
+      default: ""
     - name: azure-target
       type: string
+      default: ""
     - name: azure-client-id
       type: string
       default: ""
@@ -38,6 +40,7 @@ spec:
       default: /var/run/secrets/azure/tokens/azure-identity-token
     - name: gcp-target
       type: string
+      default: ""
     - name: gcp-token-path
       type: string
       default: /var/run/secrets/tokens/gcp-token

@@ -32,9 +32,9 @@ spec:
                   name: forgejo-db-secret
                   key: password
             - name: FORGEJO__server__DOMAIN
-              value: "git.dockerworker.ai"
+              value: "git.example.com"
             - name: FORGEJO__server__ROOT_URL
-              value: "https://git.dockerworker.ai"
+              value: "https://git.example.com"
           ports:
             - name: http
               containerPort: 3000

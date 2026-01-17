@@ -12,7 +12,7 @@ spec:
     serviceAccountName: tekton-promoter-sa
   params:
     - name: image
-      value: registry.example.com/app:latest
+      value: registry.example.com/__IMAGE_NAME__:__IMAGE_TAG__
     - name: dockerfile
       value: ./Dockerfile
     - name: context
@@ -22,15 +22,15 @@ spec:
     - name: aws-role-arn
       value: arn:aws:iam::123456789012:role/tekton-promoter
     - name: aws-target
-      value: 123456789012.dkr.ecr.us-east-1.amazonaws.com/app:latest
+      value: 123456789012.dkr.ecr.us-east-1.amazonaws.com/__IMAGE_NAME__:__IMAGE_TAG__
     - name: azure-target
-      value: example.azurecr.io/app:latest
+      value: example.azurecr.io/__IMAGE_NAME__:__IMAGE_TAG__
     - name: azure-client-id
       value: REPLACE_WITH_AZURE_CLIENT_ID
     - name: azure-tenant-id
       value: REPLACE_WITH_AZURE_TENANT_ID
     - name: gcp-target
-      value: us-docker.pkg.dev/project/repo/app:latest
+      value: us-docker.pkg.dev/project/repo/__IMAGE_NAME__:__IMAGE_TAG__
   workspaces:
     - name: source
       volumeClaimTemplate:

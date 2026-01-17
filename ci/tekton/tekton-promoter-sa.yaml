@@ -5,4 +5,5 @@ metadata:
   namespace: tekton-pipelines
   annotations:
     azure.workload.identity/use: "true"
-    azure.workload.identity/client-id: REPLACE_WITH_AZURE_CLIENT_ID
+    # Set via environment-specific patch or overlay.
+    azure.workload.identity/client-id: ""

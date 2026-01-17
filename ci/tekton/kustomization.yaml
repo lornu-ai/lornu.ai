@@ -17,7 +17,3 @@ resources:
   - trigger-binding-flux.yaml
   - trigger-template-dagger.yaml
   - event-listener-flux.yaml
-  # OIDC Multi-Cloud Promotion (Issue #150)
-  - tekton-promoter-sa.yaml
-  - task-cloud-promote.yaml
-  - pipeline-build-promote.yaml
