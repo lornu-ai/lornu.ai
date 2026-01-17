@@ -1,0 +1,156 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: cloud-promote-artifact
+  namespace: lornu-ci
+  labels:
+    lornu.ai/environment: production
+    lornu.ai/component: tekton
+    lornu.ai/managed-by: flux
+spec:
+  description: |
+    Promotes container images across multi-cloud registries using OIDC authentication.
+    Supports AWS ECR, GCP Artifact Registry, and Azure ACR without static credentials.
+  params:
+    - name: source-image
+      type: string
+      description: Source image reference (from build artifact)
+    - name: aws-ecr-url
+      type: string
+      description: AWS ECR target URL
+      default: ""
+    - name: gcp-gar-url
+      type: string
+      description: GCP Artifact Registry target URL
+      default: ""
+    - name: azure-acr-url
+      type: string
+      description: Azure ACR target URL
+      default: ""
+    - name: aws-region
+      type: string
+      default: us-east-2
+  volumes:
+    - name: gcp-oidc-token
+      projected:
+        sources:
+          - serviceAccountToken:
+              path: token
+              # Replace __GCP_*__ placeholders before applying
+              audience: "//iam.googleapis.com/projects/__GCP_PROJECT_NUM__/locations/global/workloadIdentityPools/__GCP_POOL_ID__/providers/__GCP_PROVIDER_ID__"
+              expirationSeconds: 3600
+    - name: azure-oidc-token
+      projected:
+        sources:
+          - serviceAccountToken:
+              path: token
+              audience: api://AzureADTokenExchange
+              expirationSeconds: 3600
+  steps:
+    # Step 1: AWS ECR promotion (uses AWS CLI image)
+    - name: promote-aws
+      image: amazon/aws-cli:2.15.0
+      env:
+        - name: SOURCE_IMAGE
+          value: $(params.source-image)
+        - name: AWS_ECR_URL
+          value: $(params.aws-ecr-url)
+        - name: AWS_REGION
+          value: $(params.aws-region)
+        - name: AWS_WEB_IDENTITY_TOKEN_FILE
+          value: /var/run/secrets/eks.amazonaws.com/serviceaccount/token
+        - name: AWS_ROLE_ARN
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.annotations['eks.amazonaws.com/role-arn']
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        if [ -z "$AWS_ECR_URL" ]; then
+          echo "Skipping AWS ECR (no target URL provided)"
+          exit 0
+        fi
+
+        echo "=== AWS ECR Promotion ==="
+        echo "Source: $SOURCE_IMAGE"
+        echo "Target: $AWS_ECR_URL"
+
+        # Install skopeo
+        yum install -y skopeo > /dev/null 2>&1 || dnf install -y skopeo > /dev/null 2>&1
+
+        # Authenticate via IRSA
+        aws ecr get-login-password --region $AWS_REGION | \
+          skopeo login --username AWS --password-stdin $(echo $AWS_ECR_URL | cut -d'/' -f1)
+
+        # Copy image
+        skopeo copy --all docker://$SOURCE_IMAGE docker://$AWS_ECR_URL
+        echo "✓ AWS ECR promotion complete"
+
+    # Step 2: GCP Artifact Registry promotion
+    - name: promote-gcp
+      image: quay.io/skopeo/stable:v1.14
+      env:
+        - name: SOURCE_IMAGE
+          value: $(params.source-image)
+        - name: GCP_GAR_URL
+          value: $(params.gcp-gar-url)
+      volumeMounts:
+        - name: gcp-oidc-token
+          mountPath: /var/run/secrets/tokens/gcp-token
+          readOnly: true
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        if [ -z "$GCP_GAR_URL" ]; then
+          echo "Skipping GCP GAR (no target URL provided)"
+          exit 0
+        fi
+
+        echo "=== GCP Artifact Registry Promotion ==="
+        echo "Source: $SOURCE_IMAGE"
+        echo "Target: $GCP_GAR_URL"
+
+        # Authenticate via projected OIDC token
+        GCP_TOKEN=$(cat /var/run/secrets/tokens/gcp-token/token)
+        REGISTRY_HOST=$(echo $GCP_GAR_URL | cut -d'/' -f1)
+        skopeo login --username oauth2accesstoken --password "$GCP_TOKEN" "$REGISTRY_HOST"
+
+        # Copy image
+        skopeo copy --all docker://$SOURCE_IMAGE docker://$GCP_GAR_URL
+        echo "✓ GCP Artifact Registry promotion complete"
+
+    # Step 3: Azure ACR promotion
+    - name: promote-azure
+      image: quay.io/skopeo/stable:v1.14
+      env:
+        - name: SOURCE_IMAGE
+          value: $(params.source-image)
+        - name: AZURE_ACR_URL
+          value: $(params.azure-acr-url)
+      volumeMounts:
+        - name: azure-oidc-token
+          mountPath: /var/run/secrets/tokens/azure-token
+          readOnly: true
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        if [ -z "$AZURE_ACR_URL" ]; then
+          echo "Skipping Azure ACR (no target URL provided)"
+          exit 0
+        fi
+
+        echo "=== Azure ACR Promotion ==="
+        echo "Source: $SOURCE_IMAGE"
+        echo "Target: $AZURE_ACR_URL"
+
+        # Authenticate via projected OIDC token
+        AZURE_TOKEN=$(cat /var/run/secrets/tokens/azure-token/token)
+        skopeo login --username 00000000-0000-0000-0000-000000000000 \
+          --password "$AZURE_TOKEN" "$AZURE_ACR_URL"
+
+        # Copy image
+        skopeo copy --all docker://$SOURCE_IMAGE docker://$AZURE_ACR_URL
+        echo "✓ Azure ACR promotion complete"
