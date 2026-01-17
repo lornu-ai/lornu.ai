@@ -1,0 +1,96 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: build-promote-pipeline
+  namespace: lornu-ci
+  labels:
+    lornu.ai/environment: production
+    lornu.ai/component: tekton
+    lornu.ai/managed-by: flux
+spec:
+  description: |
+    Build Once, Promote Everywhere pipeline using TEP-0147 Artifacts.
+    Builds image in source registry, then promotes to multi-cloud targets via OIDC.
+  params:
+    - name: git-url
+      type: string
+      description: Git repository URL
+    - name: git-revision
+      type: string
+      description: Git revision (branch, tag, or commit SHA)
+      default: main
+    - name: image-name
+      type: string
+      description: Base image name (without registry prefix)
+    - name: dockerfile
+      type: string
+      default: Dockerfile
+    - name: context
+      type: string
+      default: .
+    # Target registries (empty = skip)
+    - name: aws-ecr-url
+      type: string
+      default: ""
+    - name: gcp-gar-url
+      type: string
+      default: ""
+    - name: azure-acr-url
+      type: string
+      default: ""
+  workspaces:
+    - name: source
+      description: Workspace for git clone and build context
+    - name: dockerconfig
+      description: Docker config for build registry auth (optional)
+      optional: true
+  tasks:
+    - name: git-clone
+      taskRef:
+        name: git-clone
+        kind: ClusterTask
+      params:
+        - name: url
+          value: $(params.git-url)
+        - name: revision
+          value: $(params.git-revision)
+      workspaces:
+        - name: output
+          workspace: source
+
+    - name: build
+      runAfter:
+        - git-clone
+      taskRef:
+        name: kaniko
+        kind: ClusterTask
+      params:
+        - name: IMAGE
+          value: $(params.image-name):$(params.git-revision)
+        - name: DOCKERFILE
+          value: $(params.dockerfile)
+        - name: CONTEXT
+          value: $(params.context)
+      workspaces:
+        - name: source
+          workspace: source
+        - name: dockerconfig
+          workspace: dockerconfig
+      # TEP-0147: Emit image reference as artifact
+      # The built image URL is available via $(tasks.build.results.IMAGE_URL)
+
+    - name: promote
+      runAfter:
+        - build
+      taskRef:
+        name: cloud-promote-artifact
+      params:
+        # TEP-0147: Consume artifact from build task
+        - name: source-image
+          value: $(tasks.build.results.IMAGE_URL)
+        - name: aws-ecr-url
+          value: $(params.aws-ecr-url)
+        - name: gcp-gar-url
+          value: $(params.gcp-gar-url)
+        - name: azure-acr-url
+          value: $(params.azure-acr-url)
