@@ -206,6 +206,28 @@ ci-fast: scan-secrets
     dagger run bun ci/main.ts --skip-infra
 
 # ============================================
+# Multi-Cloud OIDC Promotion (Issue #150)
+# ============================================
+
+# Trigger OIDC-only multi-cloud promotion pipeline
+promote-multi-cloud image tag:
+    @echo "Triggering OIDC multi-cloud promotion..."
+    @echo "Image: {{image}}:{{tag}}"
+    kubectl create -n lornu-ci -f ci/tekton/pipeline-build-promote.yaml --dry-run=client -o yaml | \
+        sed "s|\$IMAGE_REF|{{image}}:{{tag}}|g" | \
+        kubectl create -f -
+
+# Apply Tekton OIDC promotion resources to cluster
+apply-tekton-promote:
+    @echo "Applying Tekton OIDC promotion resources..."
+    kubectl apply -k ci/tekton/ -n lornu-ci
+
+# Validate Tekton promotion manifests (dry-run)
+validate-tekton-promote:
+    @echo "Validating Tekton OIDC promotion manifests..."
+    kubectl apply -k ci/tekton/ -n lornu-ci --dry-run=server
+
+# ============================================
 # Clean & Security Lifecycle (Issue #44)
 # ============================================
 

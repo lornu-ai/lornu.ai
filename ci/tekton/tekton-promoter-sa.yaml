@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tekton-promoter-sa
+  namespace: lornu-ci
+  labels:
+    lornu.ai/environment: production
+    lornu.ai/component: tekton
+    lornu.ai/managed-by: flux
+  annotations:
+    # AWS IRSA - Role must have ECR push permissions
+    eks.amazonaws.com/role-arn: ${AWS_PROMOTER_ROLE_ARN}
+---
+# ESO ServiceAccount for secret store access (OIDC-based)
+apiVersion: external-secrets.io/v1beta1
+kind: ClusterSecretStore
+metadata:
+  name: lornu-promoter-aws
+  labels:
+    lornu.ai/environment: production
+    lornu.ai/component: eso
+    lornu.ai/managed-by: flux
+spec:
+  provider:
+    aws:
+      service: SecretsManager
+      region: us-east-2
+      auth:
+        jwt:
+          serviceAccountRef:
+            name: tekton-promoter-sa
+            namespace: lornu-ci
+---
+apiVersion: external-secrets.io/v1beta1
+kind: ClusterSecretStore
+metadata:
+  name: lornu-promoter-gcp
+  labels:
+    lornu.ai/environment: production
+    lornu.ai/component: eso
+    lornu.ai/managed-by: flux
+spec:
+  provider:
+    gcpsm:
+      projectID: ${GCP_PROJECT_ID}
+      auth:
+        workloadIdentity:
+          clusterLocation: ${GCP_CLUSTER_LOCATION}
+          clusterName: ${GCP_CLUSTER_NAME}
+          clusterProjectID: ${GCP_PROJECT_ID}
+          serviceAccountRef:
+            name: tekton-promoter-sa
+            namespace: lornu-ci
+---
+apiVersion: external-secrets.io/v1beta1
+kind: ClusterSecretStore
+metadata:
+  name: lornu-promoter-azure
+  labels:
+    lornu.ai/environment: production
+    lornu.ai/component: eso
+    lornu.ai/managed-by: flux
+spec:
+  provider:
+    azurekv:
+      tenantId: ${AZURE_TENANT_ID}
+      vaultUrl: ${AZURE_KEYVAULT_URL}
+      authType: WorkloadIdentity
+      serviceAccountRef:
+        name: tekton-promoter-sa
+        namespace: lornu-ci
