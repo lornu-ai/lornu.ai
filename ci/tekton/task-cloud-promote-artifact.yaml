@@ -88,15 +88,6 @@ spec:
         client_id="$(params.azure-client-id)"
         tenant_id="$(params.azure-tenant-id)"
         token_file="$(params.azure-federated-token-path)"
-        if [ -z "$client_id" ]; then
-          client_id="${AZURE_CLIENT_ID:-}"
-        fi
-        if [ -z "$tenant_id" ]; then
-          tenant_id="${AZURE_TENANT_ID:-}"
-        fi
-        if [ -z "$token_file" ]; then
-          token_file="${AZURE_FEDERATED_TOKEN_FILE:-}"
-        fi
         if [ -z "$client_id" ] || [ -z "$tenant_id" ]; then
           echo "Missing Azure client or tenant ID for Workload Identity." >&2
           exit 1

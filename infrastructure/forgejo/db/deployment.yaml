@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: postgres
-          image: bitnami/postgresql:16
+          image: bitnami/postgresql:16.2.0
           env:
             - name: POSTGRESQL_USERNAME
               value: "forgejo"

@@ -67,7 +67,3 @@ spec:
           value: $(params.gcp-target)
         - name: gcp-token-path
           value: $(params.gcp-token-path)
-      artifacts:
-        inputs:
-          - name: built-image
-            from: $(params.source-image)

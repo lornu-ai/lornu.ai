@@ -88,9 +88,5 @@ spec:
           value: $(params.gcp-target)
         - name: gcp-token-path
           value: $(params.gcp-token-path)
-      artifacts:
-        inputs:
-          - name: built-image
-            from: $(tasks.build.results.image-ref)
       runAfter:
         - build
