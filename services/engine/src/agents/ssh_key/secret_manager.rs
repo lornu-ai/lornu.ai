@@ -15,6 +15,22 @@ use gcloud_sdk::{GoogleApi, GoogleAuthMiddleware};
 use std::collections::HashMap;
 use tracing::{debug, info, warn};
 
+/// Validate a GCP Secret Manager secret name
+fn validate_secret_name(secret_name: &str) -> Result<(), SshKeyError> {
+    if secret_name.is_empty()
+        || secret_name.len() > 255
+        || !secret_name
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+    {
+        return Err(SshKeyError::InvalidSecretName(format!(
+            "Secret name must be 1-255 alphanumeric characters, hyphens, or underscores: {}",
+            secret_name
+        )));
+    }
+    Ok(())
+}
+
 /// GCP Secret Manager client for write operations
 pub struct SecretManagerWriter {
     client: GoogleApi<SecretManagerServiceClient<GoogleAuthMiddleware>>,
@@ -154,17 +170,7 @@ impl SecretManagerWriter {
         labels: HashMap<String, String>,
     ) -> Result<String, SshKeyError> {
         // Validate secret name
-        if secret_name.is_empty()
-            || secret_name.len() > 255
-            || !secret_name
-                .chars()
-                .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
-        {
-            return Err(SshKeyError::InvalidSecretName(format!(
-                "Secret name must be 1-255 alphanumeric characters, hyphens, or underscores: {}",
-                secret_name
-            )));
-        }
+        validate_secret_name(secret_name)?;
 
         // Check if secret exists
         let exists = self
@@ -195,8 +201,8 @@ impl SecretManagerWriter {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
+pub(crate) mod tests {
+    use super::validate_secret_name;
 
     #[test]
     fn test_validate_secret_name() {
@@ -209,18 +215,5 @@ mod tests {
         assert!(validate_secret_name("").is_err());
         assert!(validate_secret_name("key.with.dots").is_err());
         assert!(validate_secret_name("key with spaces").is_err());
-    }
-
-    fn validate_secret_name(name: &str) -> Result<(), SshKeyError> {
-        if name.is_empty()
-            || name.len() > 255
-            || !name
-                .chars()
-                .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
-        {
-            Err(SshKeyError::InvalidSecretName(name.to_string()))
-        } else {
-            Ok(())
-        }
     }
 }

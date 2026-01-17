@@ -147,8 +147,6 @@ impl SshKeyAgent {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn test_deploy_key_secret_name_generation() {
         let repo = "lornu-ai/private-lornu-ai";
