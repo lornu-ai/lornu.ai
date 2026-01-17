@@ -9,7 +9,8 @@ metadata:
     lornu.ai/managed-by: flux
   annotations:
     # AWS IRSA - Role must have ECR push permissions
-    eks.amazonaws.com/role-arn: ${AWS_PROMOTER_ROLE_ARN}
+    # Replace __AWS_PROMOTER_ROLE_ARN__ before applying
+    eks.amazonaws.com/role-arn: __AWS_PROMOTER_ROLE_ARN__
 ---
 # ESO ServiceAccount for secret store access (OIDC-based)
 apiVersion: external-secrets.io/v1beta1
@@ -42,12 +43,13 @@ metadata:
 spec:
   provider:
     gcpsm:
-      projectID: ${GCP_PROJECT_ID}
+      # Replace __GCP_*__ placeholders before applying
+      projectID: __GCP_PROJECT_ID__
       auth:
         workloadIdentity:
-          clusterLocation: ${GCP_CLUSTER_LOCATION}
-          clusterName: ${GCP_CLUSTER_NAME}
-          clusterProjectID: ${GCP_PROJECT_ID}
+          clusterLocation: __GCP_CLUSTER_LOCATION__
+          clusterName: __GCP_CLUSTER_NAME__
+          clusterProjectID: __GCP_PROJECT_ID__
           serviceAccountRef:
             name: tekton-promoter-sa
             namespace: lornu-ci
@@ -63,8 +65,9 @@ metadata:
 spec:
   provider:
     azurekv:
-      tenantId: ${AZURE_TENANT_ID}
-      vaultUrl: ${AZURE_KEYVAULT_URL}
+      # Replace __AZURE_*__ placeholders before applying
+      tenantId: __AZURE_TENANT_ID__
+      vaultUrl: __AZURE_KEYVAULT_URL__
       authType: WorkloadIdentity
       serviceAccountRef:
         name: tekton-promoter-sa

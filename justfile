@@ -213,8 +213,7 @@ ci-fast: scan-secrets
 promote-multi-cloud image tag:
     @echo "Triggering OIDC multi-cloud promotion..."
     @echo "Image: {{image}}:{{tag}}"
-    kubectl create -n lornu-ci -f ci/tekton/pipeline-build-promote.yaml --dry-run=client -o yaml | \
-        sed "s|\$IMAGE_REF|{{image}}:{{tag}}|g" | \
+    sed "s|__IMAGE_NAME__|{{image}}|g; s|__IMAGE_TAG__|{{tag}}|g" ci/tekton/pipelinerun-promote-template.yaml | \
         kubectl create -f -
 
 # Apply Tekton OIDC promotion resources to cluster
