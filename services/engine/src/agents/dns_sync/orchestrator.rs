@@ -3,7 +3,6 @@
 //! The main agent that coordinates endpoint discovery and Cloudflare updates.
 
 use anyhow::{Context, Result};
-use base64::Engine;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::env;
