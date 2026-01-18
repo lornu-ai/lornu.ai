@@ -1,0 +1,16 @@
+{
+  "name": "ai-agent-pr-rebase",
+  "version": "0.1.0",
+  "private": true,
+  "description": "An AI agent to rebase all PRs.",
+  "type": "module",
+  "scripts": {
+    "start": "bun run index.ts"
+  },
+  "dependencies": {
+    "@octokit/rest": "^22.0.1"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}
